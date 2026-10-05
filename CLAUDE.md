@@ -23,12 +23,14 @@ Sized against mg-wipeout's defaults: a 7 m/s run, a 1.25 m jump at 20 m/s², whi
 
 A level is **a course or an arena that plays differently from every other**, or a section that changes how one plays. In order of preference, as everywhere in this family:
 
-1. **An existing course rebuilt so it plays the way its blurb says** (The Sweeper's "high arms to duck" has no high arm yet; Trapdoor Run's tiles give no warning before they drop — that one is a game change too).
+1. **An existing course rebuilt so it plays the way its blurb says.** Both of the original gaps are closed: The Sweeper has a high arm to duck (`high_sweeper`), and a tile shows red for `TILE_WARN_SECONDS` before it drops.
 2. **A new section kind in the builder**, made of existing piece kinds, used in at least one course.
 3. **A new course or arena** — only with a blurb that says what makes it different, a stand-in finishing it in `headless_courses`, and a render (`mg-wipeout/tools/shot.sh --view=course --wo-course-ids=<id>`).
 
 A new piece KIND is a game change (`wo_course_doc.gd` and `wo_course.gd`), and a level after that.
 
-## Not here yet
+## Publishing
 
-- **Publishing.** Nothing here is in any pack. The game repository's pack does not include `courses/` (it is a link), so a delivered server has only the built-in practice course until this repository publishes its documents somewhere a server mounts. See mg-wipeout's "Still to do".
+**This repository is a pack of its own, mounted on the server alone.** mg-wipeout's `game.yml` names it under `server_dependencies`; a server mounts it at `res://dot_cloud/<owner>/mg-wipeout-maps/<version>/` and the game adds that mount's `courses/` to its catalogue (`WoModule._add_delivered_courses`). It is never in a client's `content.sync`: a client is sent the one document being played. `.github/workflows/release.yml` runs `build.py --check` and then dot-ci's release with `pack: true` (and `server-compat: false`, because there is no code in it to check). In dot-server-deploy it is `content/wipeout_maps/` (`tmc/wipeout_maps`), and `examples/wipeout_client.tscn` is the proof that it arrives: it fails seven checks with the dependency removed.
+
+**A new course reaches servers by a release here and nothing else** — no game release, no shell. A server picks it up at its next install, because `install-games` pins `@latest` when it installs.
