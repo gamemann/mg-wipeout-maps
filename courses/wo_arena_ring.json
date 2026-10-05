@@ -1,0 +1,149 @@
+{
+ "format": 1,
+ "kind": "arena",
+ "id": "wo_arena_ring",
+ "name": "The Ring",
+ "author": "mg-wipeout",
+ "blurb": "A round floor, a slow arm in the middle, and nowhere to hide from it.",
+ "theme": {
+  "sky": [
+   0.38,
+   0.36,
+   0.62
+  ],
+  "horizon": [
+   0.95,
+   0.66,
+   0.48
+  ],
+  "water": [
+   0.18,
+   0.24,
+   0.42
+  ],
+  "sun": [
+   1.0,
+   0.78,
+   0.6
+  ]
+ },
+ "kill_height": -8.0,
+ "pieces": [
+  {
+   "kind": "cylinder",
+   "at": [
+    0.0,
+    -0.5,
+    0.0
+   ],
+   "radius": 14.0,
+   "height": 1.0,
+   "role": "arena"
+  },
+  {
+   "kind": "spinner",
+   "at": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "arm_length": 9.0,
+   "arm_height": 0.6,
+   "speed": 40.0,
+   "arms": 2,
+   "hub_radius": 0.9
+  }
+ ],
+ "spawns": [
+  {
+   "at": [
+    0.0,
+    0.0,
+    -11.0
+   ],
+   "size": [
+    4.0,
+    3.0
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    11.0
+   ],
+   "size": [
+    4.0,
+    3.0
+   ]
+  },
+  {
+   "at": [
+    -11.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    3.0,
+    4.0
+   ]
+  },
+  {
+   "at": [
+    11.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    3.0,
+    4.0
+   ]
+  },
+  {
+   "at": [
+    8.0,
+    0.0,
+    8.0
+   ],
+   "size": [
+    3.0,
+    3.0
+   ]
+  },
+  {
+   "at": [
+    -8.0,
+    0.0,
+    -8.0
+   ],
+   "size": [
+    3.0,
+    3.0
+   ]
+  }
+ ],
+ "drops": [
+  {
+   "at": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ]
+  }
+ ],
+ "gallery": {
+  "at": [
+   0.0,
+   6.0,
+   20.0
+  ],
+  "size": [
+   16.0,
+   5.0
+  ]
+ }
+}
