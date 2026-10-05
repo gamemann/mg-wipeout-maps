@@ -125,6 +125,20 @@ class Course:
                  arm_thickness=0.35, speed=speed, arms=arms, phase=phase)
         self.point(self.z + 1.2)
 
+    def high_sweeper(self, length=14.0, width=6.0, speed=70.0, arms=2, phase=0.0):
+        """An arm at head height, swinging across from a post at the side. Duck it.
+
+        1.45 m up and 0.3 m thick: its underside is at 1.3 m, over a crouched player (0.9 m)
+        and through a standing one (1.8 m). Running crouched is slow, which is the price.
+        """
+        z0 = self.z
+        self.deck(length, width)
+        hub_x = self.x + width / 2 + 0.6
+        self.add(kind="spinner", at=v(hub_x, self.y, z0 - length / 2), arm_length=width + 0.4,
+                 arm_height=1.45, arm_thickness=0.3, hub_height=2.2, speed=speed, arms=arms,
+                 phase=phase)
+        self.point(self.z + 1.2)
+
     def centre_spinner(self, size=11.0, speed=70.0, height=0.6, arms=2, phase=0.0):
         """A square deck with a post in the middle and arms round it; run round the post."""
         z0 = self.z
@@ -470,6 +484,8 @@ def the_sweeper():
     c.side_sweeper(length=12, speed=75, height=0.55, arms=3, phase=40)
     c.deck(4)
     c.checkpoint()
+    c.high_sweeper(length=14, speed=60, arms=2)
+    c.gap(2.2)
     c.centre_spinner(size=12, speed=80, height=0.6, arms=3)
     c.gap(2.4)
     c.side_sweeper(length=13, speed=90, height=0.55, arms=2, phase=90)

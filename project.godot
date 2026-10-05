@@ -1,0 +1,12 @@
+; mg-wipeout-maps is data, not a game: the courses and arenas mg-wipeout reads. It is a
+; Godot project only so dot-ci's release can import it and attach the -pack.zip the site
+; publishes as gamemann/mg-wipeout-maps — the pack mg-wipeout's game.yml names under
+; server_dependencies, mounted on servers and never sent to a player.
+
+config_version=5
+
+[application]
+
+config/name="mg-wipeout-maps"
+config/description="Courses and arenas for mg-wipeout, as JSON documents."
+config/features=PackedStringArray("4.7")
