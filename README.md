@@ -2,39 +2,42 @@ The courses and arenas for [**mg-wipeout**](https://github.com/gamemann/mg-wipeo
 
 Every course and arena is a **JSON document**, not a scene. A server reads the documents in its course directory and sends the one it is playing to every client as the round begins, so players need no course files at all and a new course is one file dropped into a directory.
 
+## Using it
+[dot-bootstrap](https://github.com/modcommunity/dot-bootstrap) clones this repository next to mg-wipeout and links it into the game as `courses/`, so `./game.sh` in mg-wipeout plays these courses with nothing else to do. On a server they are delivered as a pack of their own (`wipeout_maps`), which mg-wipeout's `./game.sh online` and `./game.sh server` build for you.
+
 ## The courses
 
 | Course | What it is |
 | --- | --- |
-| `wo_first_splash` — First Splash | Everything once, and gently: a gap, an arm, three balls and a ride |
-| `wo_spin_cycle` — Spin Cycle | Turntables, and arms that turn on top of them |
-| `wo_big_balls` — Big Balls | Three sets of balls, each set further apart, and hammers between them |
-| `wo_punch_alley` — Punch Alley | Narrow walkways and rams that strike across them |
-| `wo_trapdoor_run` — Trapdoor Run | Floors that drop out from under you, and rides across the gaps |
-| `wo_log_roll` — Log Roll | Rolling logs and tipping planks over open water |
-| `wo_the_sweeper` — The Sweeper | Low arms to jump, faster every time |
-| `wo_uphill_belt` — Uphill Belt | Up the belts, up the bouncers, and the hammers at the top |
-| `wo_hammer_gauntlet` — Hammer Gauntlet | Narrow beams under swinging hammers, and rams |
-| `wo_grand_tour` — Grand Tour | The long one: a bit of everything, four checkpoints |
+| `wo_first_splash` (First Splash) | Everything once, and gently: a gap, an arm, three balls and a ride |
+| `wo_spin_cycle` (Spin Cycle) | Turntables, and arms that turn on top of them |
+| `wo_big_balls` (Big Balls) | Three sets of balls, each set further apart, and hammers between them |
+| `wo_punch_alley` (Punch Alley) | Narrow walkways and rams that strike across them |
+| `wo_trapdoor_run` (Trapdoor Run) | Floors that drop out from under you, and rides across the gaps |
+| `wo_log_roll` (Log Roll) | Rolling logs and tipping planks over open water |
+| `wo_the_sweeper` (The Sweeper) | Low arms to jump, faster every time |
+| `wo_uphill_belt` (Uphill Belt) | Up the belts, up the bouncers, and the hammers at the top |
+| `wo_hammer_gauntlet` (Hammer Gauntlet) | Narrow beams under swinging hammers, and rams |
+| `wo_grand_tour` (Grand Tour) | The long one: a bit of everything, four checkpoints |
 
 | Arena | What it is |
 | --- | --- |
-| `wo_arena_ring` — The Ring | A round floor with a slow arm in the middle |
-| `wo_arena_islands` — Four Islands | Four islands and four narrow bridges |
-| `wo_arena_tiers` — The Steps | A three-step pyramid; the top is worth having |
-| `wo_arena_pit` — The Pit | A square round a hole, with two rides across it |
-| `wo_arena_turntable` — Merry-Go-Round | The whole floor turns |
+| `wo_arena_ring` (The Ring) | A round floor with a slow arm in the middle |
+| `wo_arena_islands` (Four Islands) | Four islands and four narrow bridges |
+| `wo_arena_tiers` (The Steps) | A three-step pyramid; the top is worth having |
+| `wo_arena_pit` (The Pit) | A square round a hole, with two rides across it |
+| `wo_arena_turntable` (Merry-Go-Round) | The whole floor turns |
 
 ## How they are made
 
-`tools/build.py` writes every document in `courses/` from a short description of each course as a run of **sections** — a gap, a sweeper, a set of balls, a mover crossing — each of which places its pieces, its checkpoint and the route a stand-in follows together. Moving one gap moves everything after it.
+`tools/build.py` writes every document in `courses/` from a short description of each course as a run of **sections** (a gap, a sweeper, a set of balls, a mover crossing), each of which places its pieces, its checkpoint and the route a stand-in follows together. Moving one gap moves everything after it.
 
 ```bash
 python3 tools/build.py            # rewrite courses/*.json
 python3 tools/build.py --check    # exit 1 if a file differs from what the builder writes
 ```
 
-The JSON is still what the game reads and is committed; CI runs `--check`, so a hand edit to a document the builder does not know about is caught rather than lost on the next build. Hand-written documents that the builder does not produce are fine too: anything in `courses/` with a `.json` extension is loaded.
+The JSON is still what the game reads and is committed; CI runs `--check`, so a hand edit to a document the builder does not know about is caught instead of being lost on the next build. Hand-written documents that the builder does not produce are fine too: anything in `courses/` with a `.json` extension is loaded.
 
 Every course is played to the finish by a stand-in in mg-wipeout's `examples/headless_courses.tscn`, with every hazard live. A course it cannot finish inside its own clock is a course with no window somewhere, and the suite says where it got to.
 
@@ -79,7 +82,7 @@ Every piece has a `kind`, and may have `yaw` and a `role` (`deck`, `pillar`, `ca
 | `ball` | `at`, `radius` | stand only near the top (about 35°) |
 | `cylinder` | `at`, `radius`, `height` | upright |
 
-**Carriers** — solid, and whoever stands on one moves with it
+**Carriers:** solid, and whoever stands on one moves with it
 
 | kind | fields | |
 | --- | --- | --- |
@@ -91,7 +94,7 @@ Every piece has a `kind`, and may have `yaw` and a `role` (`deck`, `pillar`, `ca
 | `tiles` | `at`, `cols`, `rows`, `tile`, `gap`, `thickness`, `period`, `down`, `seed` | a grid; each tile drops out for `down` of every `period`, each at its own point in the cycle |
 | `bouncer` | `at`, `size`, `power` | throws whoever lands on it up at `power` m/s |
 
-**Hazards** — not solid; whatever they touch is thrown
+**Hazards:** not solid; whatever they touch is thrown
 
 | kind | fields | |
 | --- | --- | --- |
@@ -105,10 +108,10 @@ Every piece has a `kind`, and may have `yaw` and a `role` (`deck`, `pillar`, `ca
 
 The points a stand-in runs through, in order. Each is `{"at": [x, y, z]}` with any of:
 
-- `jump` — jump here (once on the ground); a jump point that is a top to land on is braked toward in the air;
-- `wait` — wait here until the way to the next point is clear of every hazard for the time it takes to run it;
-- `board` — this is something to land on: wait until it will be there, then run and jump at the edge;
-- `ride` — this point is ON something that moves: standing on any carrier reaches it;
+- `jump`: jump here (once on the ground); a jump point that is a top to land on is braked toward in the air;
+- `wait`: wait here until the way to the next point is clear of every hazard for the time it takes to run it;
+- `board`: this is something to land on: wait until it will be there, then run and jump at the edge;
+- `ride`: this point is ON something that moves: standing on any carrier reaches it;
 - `walk`, `reach` (metres, default 1.2).
 
 ### Arenas
@@ -126,6 +129,6 @@ The points a stand-in runs through, in order. Each is `{"at": [x, y, z]}` with a
 
 `spawns` are the areas a side can be put down in (at least two; give it four or more so the draw of who goes where varies), `drops` where props and weapons land, and `gallery` a walled box where everybody who did not finish watches from. An arena can use any piece a course can.
 
-## Licence
+## License
 
 MIT. See [LICENSE](LICENSE).
