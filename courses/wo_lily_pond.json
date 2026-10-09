@@ -1,0 +1,548 @@
+{
+ "format": 1,
+ "kind": "course",
+ "id": "wo_lily_pond",
+ "name": "Lily Pond",
+ "author": "mg-wipeout",
+ "blurb": "Spinning pads to hop across, planks that tip you into the pond, and a ferry to catch.",
+ "theme": {
+  "sky": [
+   0.5,
+   0.78,
+   0.8
+  ],
+  "horizon": [
+   0.86,
+   0.95,
+   0.9
+  ],
+  "water": [
+   0.1,
+   0.5,
+   0.46
+  ]
+ },
+ "water_height": -6.0,
+ "start": {
+  "at": [
+   0,
+   0,
+   0
+  ],
+  "size": [
+   10,
+   8
+  ],
+  "yaw": 0
+ },
+ "finish": {
+  "at": [
+   0.0,
+   0.0,
+   -101.8
+  ],
+  "size": [
+   10.0,
+   4.0,
+   2.0
+  ],
+  "lounge": [
+   0.0,
+   0.0,
+   -106.2
+  ]
+ },
+ "pieces": [
+  {
+   "kind": "box",
+   "at": [
+    0.0,
+    -0.5,
+    -8.0
+   ],
+   "size": [
+    6.0,
+    1.0,
+    8.0
+   ],
+   "role": "deck"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    -0.4,
+    -0.3,
+    -15.4
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": 50,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    0.4,
+    -0.3,
+    -19.4
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": -50,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    -0.4,
+    -0.3,
+    -23.4
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": 50,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    0.4,
+    -0.3,
+    -27.4
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": -50,
+   "role": "hazard"
+  },
+  {
+   "kind": "box",
+   "at": [
+    0.0,
+    -0.5,
+    -34.4
+   ],
+   "size": [
+    6.0,
+    1.0,
+    6.0
+   ],
+   "role": "deck"
+  },
+  {
+   "kind": "seesaw",
+   "at": [
+    0.0,
+    -0.25,
+    -41.5
+   ],
+   "size": [
+    4.0,
+    0.5,
+    5.0
+   ],
+   "amplitude": 12,
+   "period": 4.4,
+   "phase": 0.0
+  },
+  {
+   "kind": "seesaw",
+   "at": [
+    0.0,
+    -0.25,
+    -48.1
+   ],
+   "size": [
+    4.0,
+    0.5,
+    5.0
+   ],
+   "amplitude": 12,
+   "period": 4.4,
+   "phase": 0.33
+  },
+  {
+   "kind": "box",
+   "at": [
+    0.0,
+    -0.5,
+    -53.1
+   ],
+   "size": [
+    6.0,
+    1.0,
+    5.0
+   ],
+   "role": "deck"
+  },
+  {
+   "kind": "mover",
+   "from": [
+    0.0,
+    -0.4,
+    -57.9
+   ],
+   "to": [
+    0.0,
+    -0.4,
+    -62.3
+   ],
+   "size": [
+    4.0,
+    0.6,
+    4.0
+   ],
+   "period": 6.5,
+   "phase": 0.0
+  },
+  {
+   "kind": "box",
+   "at": [
+    0.0,
+    -0.5,
+    -67.6
+   ],
+   "size": [
+    6.0,
+    1.0,
+    6.0
+   ],
+   "role": "deck"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    -0.4,
+    -0.3,
+    -74.0
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": 60,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    0.4,
+    -0.3,
+    -78.0
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": -60,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    -0.4,
+    -0.3,
+    -82.0
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": 60,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    0.4,
+    -0.3,
+    -86.0
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": -60,
+   "role": "hazard"
+  },
+  {
+   "kind": "turntable",
+   "at": [
+    -0.4,
+    -0.3,
+    -90.0
+   ],
+   "radius": 1.6,
+   "thickness": 0.6,
+   "speed": 60,
+   "role": "hazard"
+  },
+  {
+   "kind": "box",
+   "at": [
+    0.0,
+    -0.5,
+    -96.0
+   ],
+   "size": [
+    6.0,
+    1.0,
+    4.0
+   ],
+   "role": "deck"
+  },
+  {
+   "kind": "box",
+   "at": [
+    0.0,
+    -0.5,
+    -105.2
+   ],
+   "size": [
+    10.0,
+    1.0,
+    10.0
+   ],
+   "role": "safe"
+  }
+ ],
+ "checkpoints": [
+  {
+   "at": [
+    0.0,
+    0.0,
+    -35.8
+   ],
+   "size": [
+    6.0,
+    4.0,
+    2.4
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -69.0
+   ],
+   "size": [
+    6.0,
+    4.0,
+    2.4
+   ]
+  }
+ ],
+ "route": [
+  {
+   "at": [
+    0.0,
+    0.0,
+    -3.2
+   ],
+   "reach": 1.0
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -10.5
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -11.4
+   ],
+   "jump": true,
+   "reach": 0.55
+  },
+  {
+   "at": [
+    -0.4,
+    0.0,
+    -15.4
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    0.4,
+    0.0,
+    -19.4
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    -0.4,
+    0.0,
+    -23.4
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    0.4,
+    0.0,
+    -27.4
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -32.6
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -36.9
+   ],
+   "jump": true,
+   "reach": 0.55
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -41.5
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -43.5
+   ],
+   "jump": true,
+   "reach": 0.55
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -48.1
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -51.8
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -53.6
+   ],
+   "reach": 0.6
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -57.9
+   ],
+   "board": true,
+   "ride": true,
+   "reach": 0.9
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -66.0
+   ],
+   "board": true,
+   "reach": 0.9
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -70.0
+   ],
+   "jump": true,
+   "reach": 0.55
+  },
+  {
+   "at": [
+    -0.4,
+    0.0,
+    -74.0
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    0.4,
+    0.0,
+    -78.0
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    -0.4,
+    0.0,
+    -82.0
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    0.4,
+    0.0,
+    -86.0
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    -0.4,
+    0.0,
+    -90.0
+   ],
+   "jump": true,
+   "reach": 0.7,
+   "onward": true
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -95.2
+   ]
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -97.5
+   ],
+   "jump": true,
+   "reach": 0.55
+  },
+  {
+   "at": [
+    0.0,
+    0.0,
+    -105.2
+   ]
+  }
+ ]
+}

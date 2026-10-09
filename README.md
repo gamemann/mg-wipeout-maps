@@ -19,6 +19,7 @@ Every course and arena is a **JSON document**, not a scene. A server reads the d
 | `wo_uphill_belt` (Uphill Belt) | Up the belts, up the bouncers, and the hammers at the top |
 | `wo_hammer_gauntlet` (Hammer Gauntlet) | Narrow beams under swinging hammers, and rams |
 | `wo_grand_tour` (Grand Tour) | The long one: a bit of everything, four checkpoints |
+| `wo_lily_pond` (Lily Pond) | Spinning pads to hop across, planks that tip you into the pond, and a ferry to catch |
 
 | Arena | What it is |
 | --- | --- |

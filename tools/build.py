@@ -176,6 +176,32 @@ class Course:
         self.z = z + spacing - last
         self.point(self.z - 1.2)
 
+    def lily_pads(self, count=4, radius=1.6, speed=55.0, spacing=4.0, swing=0.4, first=3.4, last=2.4):
+        """Small turning discs over the water, side to side, to hop across centre to centre.
+
+        The balls' rhythm with the opposite problem: a pad is flat and easy to land on, and it
+        CARRIES you -- stand on one and you are turned off the line to the next. So the hop is
+        taken at once, from the middle, where the carry is least (the edge of a 1.6 m pad at
+        55 degrees a second moves 1.5 m/s; its middle, nothing). Alternate pads turn the other
+        way, so standing still is never safe in the same direction twice.
+
+        [b]Nearly in line, at the balls' spacing.[/b] The first version zig-zagged 2.2 m across
+        and a stand-in fell 56 times on the first pad: a jump is steered very little in the
+        air, so it landed past the centre and wide of it, walked back to the centre, and took
+        the next hop carrying that walk's momentum backwards into the pond. 0.4 m either side
+        is a line a player can see is not straight, and one a jump can still follow.
+        """
+        self.point(self.z + 0.6, jump=True, reach=0.55)
+        z = self.z - first
+        for i in range(count):
+            x = self.x + (-swing if i % 2 == 0 else swing)
+            self.add(kind="turntable", at=v(x, self.y - 0.3, z), radius=radius, thickness=0.6,
+                     speed=speed if i % 2 == 0 else -speed, role="hazard")
+            self.route.append({"at": v(x, self.y, z), "jump": True, "reach": 0.7, "onward": True})
+            z -= spacing
+        self.z = z + spacing - radius - last
+        self.point(self.z - 1.2)
+
     def mover_crossing(self, length=9.0, size=4.0, period=6.0, phase=0.0, dx=0.0):
         """A gap only a mover crosses: step on at one end, step off at the other."""
         near = self.z
@@ -569,6 +595,26 @@ def grand_tour():
     return c.build()
 
 
+def lily_pond():
+    c = Course("wo_lily_pond", "Lily Pond",
+               "Spinning pads to hop across, planks that tip you into the pond, and a ferry to catch.",
+               THEMES["mint"])
+    c.run_out(8)
+    c.lily_pads(count=4, speed=50)
+    c.deck(6)
+    c.checkpoint()
+    c.seesaws(count=2, amplitude=12, period=4.4)
+    c.deck(5)
+    c.mover_crossing(length=9, period=6.5)
+    c.deck(6)
+    c.checkpoint()
+    c.lily_pads(count=5, speed=60, swing=0.4)
+    c.deck(4)
+    c.gap(2.2)
+    c.finish()
+    return c.build()
+
+
 # --- The arenas --------------------------------------------------------------------
 
 def arena(aid, name, blurb, theme, pieces, spawns, drops, gallery, kill=-8.0):
@@ -653,7 +699,7 @@ def arenas():
 
 def documents():
     courses = [first_splash(), spin_cycle(), big_balls(), punch_alley(), trapdoor_run(), log_roll(),
-               the_sweeper(), uphill_belt(), hammer_gauntlet(), grand_tour()]
+               the_sweeper(), uphill_belt(), hammer_gauntlet(), grand_tour(), lily_pond()]
     return courses + arenas()
 
 
