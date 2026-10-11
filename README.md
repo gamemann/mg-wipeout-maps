@@ -1,4 +1,4 @@
-The courses and arenas for [**mg-wipeout**](https://github.com/gamemann/mg-wipeout): obstacle courses over open water, and the arenas a final death is fought in. Ten courses and five arenas to start with.
+The courses and arenas for [**mg-wipeout**](https://github.com/zees-games/mg-wipeout): obstacle courses over open water, and the arenas a final death is fought in. Ten courses and five arenas to start with.
 
 Every course and arena is a **JSON document**, not a scene. A server reads the documents in its course directory and sends the one it is playing to every client as the round begins, so players need no course files at all and a new course is one file dropped into a directory.
 
