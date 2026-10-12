@@ -8,16 +8,19 @@ The courses and arenas mg-wipeout plays, as JSON documents. Read `../../CLAUDE.m
 
 ## What makes a course finishable, measured
 
-Sized against mg-wipeout's defaults: a 7 m/s run, a 1.25 m jump at 20 m/s², which clears about 4.9 m of flat gap. Gaps here are 3.4 m at the most and steps 0.8 m. **Every number below came from a stand-in failing in `mg-wipeout/tools/trace_course`**, and the builder's own comments say which:
+Sized against mg-wipeout's defaults: a 7 m/s run, a 1.25 m jump at 20 m/s², which clears about 4.9 m of flat gap. Gaps here are 3.4 m at the most and steps 0.8 m. **Every number below came from a stand-in failing in `mg-wipeout/tools/trace_course` or `tools/race_times`**, and the builder's own comments say which:
 
-- **Balls 4.0 m apart, logs 3.7 m** (top to top): under a full jump, because a jump is cut short in the air and never stretched, and a landing on a ball or a turning log costs speed.
+- **Balls 3.6 m apart by default (4.0 m for a hard set), logs 3.4 m, pads 3.6 m with a 1.8 m radius** (top to top): under a full jump, because a jump is cut short in the air and never stretched, and a landing on a ball or a turning log costs speed. Pads turn at 50°/s at the most.
+- **A checkpoint is plain deck, near its start** (`safe(9)`: seven metres of run-up), never in a hazard's reach: `build()` refuses one that is, because a restart at the end of a sweeper's arc was knocked in again as it stood up.
+- **A run of tops is lined up** (`lead_in`, a point on the line 3.5 m before the edge), and **a stand point is never behind the last point** (`stand`): one half a metre behind was reached at once, and a stand-in ran onto a grid of tiles two rows too far.
+- **A centre spinner ends in four metres of plain deck**: its arms reach to 0.3 m from the edge, and the jump after it was taken sideways.
 - **Hammers 4.2 m apart, rams 4.5 m**, with the wait point halfway / 2.4 m short: closer, and somebody waiting for the next one is in reach of the one behind.
-- **Side sweepers reach just short of the far edge**, and the deck is longer than their sweep, so there is ground to watch from; **centre spinners are walked round 2.2 m in from the edge**, back to the middle 3.4 m before the far edge, so the next jump is taken straight.
+- **Side sweepers reach just short of the far edge**, and the deck is longer than their sweep, so there is ground to watch from; **centre spinners are walked round 2.9 m in from the edge**, back to the middle 3.4 m before the far edge, so the next jump is taken straight.
 - **Pendulums `yaw` 0**, which swings them across the course. `yaw` 90 swings them along it, where they hit a person waiting for them.
 - **A belt on a ramp has the ramp's `pitch`.** Flat at the ramp's middle height it is a wall.
 - **Every route starts at the middle of the pad's front**: the pad is wider than the run-out after it.
 
-`mg-wipeout/examples/headless_courses.tscn` runs every course with a stand-in that never fumbles, every hazard live; all ten finish (2026-10-05: 14 s to 77 s against a 210 s clock). A course that newly fails there is a course to fix, or a bot that has found a real hole in its timing.
+`mg-wipeout/examples/headless_courses.tscn` runs every course with a stand-in that never makes a mistake, every hazard live; a course that newly fails there is a course to fix, or a bot that has found a real hole in its timing. **A course is a minute to a minute and a half for that stand-in**, and its `course_seconds` (300 to 360) about three runs of a medium field; `mg-wipeout/tools/race_times.tscn` measures a field at every difficulty, and mg-wipeout's [docs/stand-ins.md](../mg-wipeout/docs/stand-ins.md#measured) has the numbers.
 
 ## What a level is here, for the nightly quota
 
@@ -37,4 +40,6 @@ A new piece KIND is a game change (`wo_course_doc.gd` and `wo_course.gd`), and a
 
 **A new course reaches servers by a release here and nothing else** — no game release, no shell. A server picks it up at its next install, because `install-games` pins `@latest` when it installs.
 
-**`lily_pads` and Lily Pond (2026-10-08).** A new section of existing pieces: small turntables (`role` hazard) over the water, centre to centre at the balls' 4.0 m, alternate pads turning the other way, nearly in line (0.4 m either side). The first draft zig-zagged 2.2 m across and a stand-in fell 56 times on the first pad, because a jump is barely steered in the air: it landed past the centre and wide, and the bot then hopped back toward the centre it had overshot. So the pads are almost on the line, and their route points carry a new `onward` flag (mg-wipeout reads it): a stand-in that lands past such a point jumps, and runs up, toward the NEXT point instead of back at this one. **Lily Pond** (`wo_lily_pond`, the mint theme): four pads, two seesaws, a ferry, a second set of five pads at 60 degrees a second, a gap and the finish. A stand-in finishes it in 33.8 s with 5 falls; rendered with `--view=course --wo-course-ids=wo_lily_pond`.
+**A course with a `fall` needs mg-wipeout from 2026-10-12 on**: an older game refuses it (a piece kind it does not know) and plays the rest. Release the game before this pack. `dressing` and the `bounce` route flag are ignored by an older game, not refused.
+
+**`lily_pads` and Lily Pond (2026-10-08).** A new section of existing pieces: small turntables (`role` hazard) over the water, centre to centre at the balls' 4.0 m, alternate pads turning the other way, nearly in line (0.4 m either side). The first draft zig-zagged 2.2 m across and a stand-in fell 56 times on the first pad, because a jump is barely steered in the air: it landed past the centre and wide, and the bot then hopped back toward the centre it had overshot. So the pads are almost on the line, and their route points carry a new `onward` flag (mg-wipeout reads it): a stand-in that lands past such a point jumps, and runs up, toward the NEXT point instead of back at this one. **Lily Pond** (`wo_lily_pond`, the mint theme): four pads, two seesaws, a ferry, a second set of five pads at 60 degrees a second, a gap and the finish. Since 2026-10-12 the pads are 1.8 m across, 3.6 m apart and turn at 50°/s at most, and Lily Pond is a long course; render it with `--view=course --wo-course-ids=wo_lily_pond`.

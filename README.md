@@ -1,4 +1,4 @@
-The courses and arenas for [**mg-wipeout**](https://github.com/zees-games/mg-wipeout): obstacle courses over open water, and the arenas a final death is fought in. Ten courses and five arenas to start with.
+The courses and arenas for [**mg-wipeout**](https://github.com/zees-games/mg-wipeout): obstacle courses over open water, and the arenas a final death is fought in. Eleven courses, each a minute to two for a good run, five of them in front of a full house, and five arenas.
 
 Every course and arena is a **JSON document**, not a scene. A server reads the documents in its course directory and sends the one it is playing to every client as the round begins, so players need no course files at all and a new course is one file dropped into a directory.
 
@@ -9,17 +9,17 @@ Every course and arena is a **JSON document**, not a scene. A server reads the d
 
 | Course | What it is |
 | --- | --- |
-| `wo_first_splash` (First Splash) | Everything once, and gently: a gap, an arm, three balls and a ride |
-| `wo_spin_cycle` (Spin Cycle) | Turntables, and arms that turn on top of them |
-| `wo_big_balls` (Big Balls) | Three sets of balls, each set further apart, and hammers between them |
-| `wo_punch_alley` (Punch Alley) | Narrow walkways and rams that strike across them |
-| `wo_trapdoor_run` (Trapdoor Run) | Floors that drop out from under you, and rides across the gaps |
-| `wo_log_roll` (Log Roll) | Rolling logs and tipping planks over open water |
-| `wo_the_sweeper` (The Sweeper) | Low arms to jump, faster every time |
-| `wo_uphill_belt` (Uphill Belt) | Up the belts, up the bouncers, and the hammers at the top |
-| `wo_hammer_gauntlet` (Hammer Gauntlet) | Narrow beams under swinging hammers, and rams |
-| `wo_grand_tour` (Grand Tour) | The long one: a bit of everything, four checkpoints |
-| `wo_lily_pond` (Lily Pond) | Spinning pads to hop across, planks that tip you into the pond, and a ferry to catch |
+| `wo_first_splash` (First Splash) | The premiere, in front of a full house: a little of everything, gently, and then not so gently |
+| `wo_spin_cycle` (Spin Cycle) | Turntables, arms that turn on top of them, and spinning pads |
+| `wo_big_balls` (Big Balls) | Six sets of balls, bigger and further apart, wrecking balls between them, and the stands |
+| `wo_punch_alley` (Punch Alley) | Narrow walkways and rams that strike across them, and slime falls to wait out |
+| `wo_trapdoor_run` (Trapdoor Run) | Floors that drop out from under you, rides across the gaps, and pads that throw you on |
+| `wo_log_roll` (Log Roll) | Rolling logs and tipping planks over open water. Keep moving or go backwards |
+| `wo_the_sweeper` (The Sweeper) | Low arms to jump and high arms to duck, from both sides, faster every time, with a crowd |
+| `wo_uphill_belt` (Uphill Belt) | Up the belts and the bouncers, through the falls and the hammers, over the logs at the top |
+| `wo_hammer_gauntlet` (Hammer Gauntlet) | Narrow beams under swinging hammers, wrecking balls and rams, with a crowd |
+| `wo_grand_tour` (Grand Tour) | The long one and the season's big night: a bit of everything, ten checkpoints |
+| `wo_lily_pond` (Lily Pond) | Spinning pads, planks that tip you into the pond, waterfalls and a ferry to catch |
 
 | Arena | What it is |
 | --- | --- |
@@ -40,7 +40,9 @@ python3 tools/build.py --check    # exit 1 if a file differs from what the build
 
 The JSON is still what the game reads and is committed; CI runs `--check`, so a hand edit to a document the builder does not know about is caught instead of being lost on the next build. Hand-written documents that the builder does not produce are fine too: anything in `courses/` with a `.json` extension is loaded.
 
-Every course is played to the finish by a stand-in in mg-wipeout's `examples/headless_courses.tscn`, with every hazard live. A course it cannot finish inside its own clock is a course with no window somewhere, and the suite says where it got to.
+Every course is played to the finish by a stand-in in mg-wipeout's `examples/headless_courses.tscn`, with every hazard live. A course it cannot finish inside its own clock is a course with no window somewhere, and the suite says where it got to. mg-wipeout's `tools/race_times.tscn` races a field of eight at every difficulty and is what each course's length is set by.
+
+The builder refuses a checkpoint inside any hazard's reach (a restart into a sweeper's arc), and `event()` dresses a course for a big night from its route: stands down both sides in turn, light towers, flags at the start and screens at both ends.
 
 ## The format
 
@@ -102,6 +104,7 @@ Every piece has a `kind`, and may have `yaw` and a `role` (`deck`, `pillar`, `ca
 | `spinner` | `at` (the base of its post), `arm_length`, `speed`, `arms`, `arm_height`, `arm_thickness`, `hub_radius`, `hub_height`, `phase` | arms round a solid post; jump a low one, duck a high one |
 | `pendulum` | `pivot`, `length`, `radius`, `swing`, `period`, `phase` | a ball on a rod, swinging `swing` degrees either side along its X axis (yaw 0 swings across a course) |
 | `pusher` | `at`, `size`, `reach`, `period`, `duty`, `phase` | a ram that strikes `reach` metres along its −Z, holds for `duty` of its period, and goes home |
+| `fall` | `at` (on the deck), `size` (width, height, thickness), `period`, `duty`, `phase`, `push`, `tint` | a curtain of water (or slime, by `tint`) pouring for `duty` of its period after 0.7 s of drips; it throws whoever is under it `push` m/s off along its own +X. Needs mg-wipeout with `fall` (2026-10-12 on) |
 
 `phase` is a fraction of a period (0–1) for anything with a period, and degrees for anything that turns. Everything that moves is a function of time and nothing else, which is what lets every machine agree about where it is without being told.
 
@@ -113,7 +116,21 @@ The points a stand-in runs through, in order. Each is `{"at": [x, y, z]}` with a
 - `wait`: wait here until the way to the next point is clear of every hazard for the time it takes to run it;
 - `board`: this is something to land on: wait until it will be there, then run and jump at the edge;
 - `ride`: this point is ON something that moves: standing on any carrier reaches it;
+- `bounce`: this point is on a bouncer: passing over it in the air reaches it;
+- `onward`: a jump point the stand-in may land past; the jump from it aims at the next point;
 - `walk`, `reach` (metres, default 1.2).
+
+### Dressing
+
+Optional, and only ever drawn: a course with none plays the same. Each entry is `{"kind", "at", "size", "yaw", "seed", "text", "tint"}`; a kind the client does not know is skipped.
+
+| kind | |
+| --- | --- |
+| `stands` | a grandstand full of people; `at` is the middle of its front edge at the first row's height, `size` is length, height, depth, and it faces its own −Z; `text` along the back |
+| `banner` | a board on two poles with `text` on both faces |
+| `lights` | a light tower, `size.y` tall, its lamps facing −Z |
+| `screen` | a big screen facing −Z; it shows `text`, and in a race the leaders |
+| `flags` | a row of flags on poles along `size.x` |
 
 ### Arenas
 
