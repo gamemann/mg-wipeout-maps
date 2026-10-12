@@ -9,17 +9,17 @@ Every course and arena is a **JSON document**, not a scene. A server reads the d
 
 | Course | What it is |
 | --- | --- |
-| `wo_first_splash` (First Splash) | The premiere, in front of a full house: a little of everything, gently, and then not so gently |
-| `wo_spin_cycle` (Spin Cycle) | Turntables, arms that turn on top of them, and spinning pads |
-| `wo_big_balls` (Big Balls) | Six sets of balls, bigger and further apart, wrecking balls between them, and the stands |
+| `wo_first_splash` (First Splash) | The premiere, in front of a full house: a little of everything round the bay and up the hill, gently, and then not so gently |
+| `wo_spin_cycle` (Spin Cycle) | Turntables, arms that turn on top of them, spinning pads, and a course that turns with them |
+| `wo_big_balls` (Big Balls) | Seven sets of balls round the bay and up the hill, bigger and further apart, wrecking balls between them, and the stands |
 | `wo_punch_alley` (Punch Alley) | Narrow walkways and rams that strike across them, and slime falls to wait out |
-| `wo_trapdoor_run` (Trapdoor Run) | Floors that drop out from under you, rides across the gaps, and pads that throw you on |
+| `wo_trapdoor_run` (Trapdoor Run) | Floors that drop out from under you, rides across the gaps, pads that throw you on, and two forks: the long jumps or the pads straight across, or the long way round on the rides |
 | `wo_log_roll` (Log Roll) | Rolling logs and tipping planks over open water. Keep moving or go backwards |
-| `wo_the_sweeper` (The Sweeper) | Low arms to jump and high arms to duck, from both sides, faster every time, with a crowd |
-| `wo_uphill_belt` (Uphill Belt) | Up the belts and the bouncers, through the falls and the hammers, over the logs at the top |
-| `wo_hammer_gauntlet` (Hammer Gauntlet) | Narrow beams under swinging hammers, wrecking balls and rams, with a crowd |
-| `wo_grand_tour` (Grand Tour) | The long one and the season's big night: a bit of everything, ten checkpoints |
-| `wo_lily_pond` (Lily Pond) | Spinning pads, planks that tip you into the pond, waterfalls and a ferry to catch |
+| `wo_the_sweeper` (The Sweeper) | Low arms to jump and high arms to duck, from both sides, round every corner, faster every time, with a crowd |
+| `wo_uphill_belt` (Uphill Belt) | Up the hill in two switchbacks of belts, bouncers, falls and hammers, then round a spiral to a finish on the summit |
+| `wo_hammer_gauntlet` (Hammer Gauntlet) | Narrow beams under swinging hammers, wrecking balls and rams, up to a high beam and down again, with a crowd |
+| `wo_grand_tour` (Grand Tour) | The long one and the season's big night: round the bay and up the hill, a bit of everything, two forks to gamble on |
+| `wo_lily_pond` (Lily Pond) | A winding path round the pond: spinning pads, tipping planks, waterfalls, and a fork between the ferry and the pads |
 
 | Arena | What it is |
 | --- | --- |
@@ -31,7 +31,7 @@ Every course and arena is a **JSON document**, not a scene. A server reads the d
 
 ## How they are made
 
-`tools/build.py` writes every document in `courses/` from a short description of each course as a run of **sections** (a gap, a sweeper, a set of balls, a mover crossing), each of which places its pieces, its checkpoint and the route a stand-in follows together. Moving one gap moves everything after it.
+`tools/build.py` writes every document in `courses/` from a short description of each course as a run of **sections** (a gap, a sweeper, a set of balls, a mover crossing), each of which places its pieces, its checkpoint and the route a stand-in follows together. Moving one gap moves everything after it. Sections that bend the course (`turn`, `curve`, `kink`, `u_turn`), change its height (`climb`, and the belts, bouncers and steps that already did) and split it (`fork`, `detour`) carry everything after them round with them, so a course is a winding show rather than a corridor.
 
 ```bash
 python3 tools/build.py            # rewrite courses/*.json
@@ -42,11 +42,11 @@ The JSON is still what the game reads and is committed; CI runs `--check`, so a 
 
 Every course is played to the finish by a stand-in in mg-wipeout's `examples/headless_courses.tscn`, with every hazard live. A course it cannot finish inside its own clock is a course with no window somewhere, and the suite says where it got to. mg-wipeout's `tools/race_times.tscn` races a field of eight at every difficulty and is what each course's length is set by.
 
-The builder refuses a checkpoint inside any hazard's reach (a restart into a sweeper's arc), and `event()` dresses a course for a big night from its route: stands down both sides in turn, light towers, flags at the start and screens at both ends.
+The builder refuses a checkpoint inside any hazard's reach (a restart into a sweeper's arc), a course that runs into or over itself, and a hazard that reaches another part of the course; `event()` dresses a course for a big night from its route: stands down both sides in turn, light towers, flags at the start and screens at both ends.
 
 ## The format
 
-Every length is metres, every angle degrees, every time seconds. Courses run toward **−Z** (yaw 0 faces −Z). A position is the **centre** of what it places, except where a field says otherwise. Colours are `[r, g, b]` in 0–1.
+Every length is metres, every angle degrees, every time seconds. A course may run any way; yaw 0 faces **−Z**, and every piece, checkpoint and the finish take a `yaw`. A position is the **centre** of what it places, except where a field says otherwise. Colours are `[r, g, b]` in 0–1.
 
 ```json
 {
@@ -118,7 +118,8 @@ The points a stand-in runs through, in order. Each is `{"at": [x, y, z]}` with a
 - `ride`: this point is ON something that moves: standing on any carrier reaches it;
 - `bounce`: this point is on a bouncer: passing over it in the air reaches it;
 - `onward`: a jump point the stand-in may land past; the jump from it aims at the next point;
-- `walk`, `reach` (metres, default 1.2).
+- `walk`, `reach` (metres, default 1.2);
+- `branch` and `risky`: a fork (format 2). The points of each way through carry its number (1, 2…); points without one are the way everybody goes. A fork's points are laid out after the point it starts at, one branch's then the next's, and a stand-in takes the branch marked `risky` (the faster, harder way) by its `wo_bot_risk` and skips the other's points. A course with a fork says `"format": 2`, which an mg-wipeout from before 2026-10-12 refuses (and plays the rest).
 
 ### Dressing
 

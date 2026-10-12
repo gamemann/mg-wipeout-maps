@@ -68,6 +68,18 @@ class Course:
         self.x = 0.0
         self.y = 0.0
         self.z = -4.0
+        # [b]Frames: how a course turns.[/b] Every section is written as if the course ran
+        # down -Z, in the frame it was placed in: `frames[i]` is that frame's origin and
+        # heading in the world (degrees, positive turning left, the way a piece's `yaw`
+        # turns). A turn starts a new frame; `build()` carries everything into the world. A
+        # course that never turns stays in frame 0, which is the world, so its document is
+        # the same to the byte as before turns existed.
+        self.frames = [(0.0, 0.0, 0.0)]
+        self.f = 0
+        # Which branch of a fork the cursor is on (0: the one way everybody goes), and
+        # whether that branch is the risky one. See `fork`.
+        self.branch = 0
+        self.risky = False
         # The middle of the pad's front first: the pad is wider than the ground after it, and
         # somebody restarting at its side who ran straight at the next point went off the edge.
         self.point(-3.2, reach=1.0)
@@ -78,12 +90,55 @@ class Course:
         for key, value in list(piece.items()):
             if isinstance(value, float):
                 piece[key] = r(value)
+        piece["_f"] = self.f
+        piece["_r"] = len(self.route)
         self.pieces.append(piece)
         return len(self.pieces) - 1
 
+    def _route(self, point):
+        point["_f"] = self.f
+        if self.branch:
+            point["branch"] = self.branch
+            if self.risky:
+                point["risky"] = True
+        self.route.append(point)
+
+    def _spine(self, entry):
+        self.spine.append(entry + (self.f,))
+
+    def _checkpoint(self, checkpoint):
+        if self.branch:
+            raise SystemExit("%s: a checkpoint inside a fork's branch, which the other branch never crosses"
+                             % self.doc["id"])
+        checkpoint["_f"] = self.f
+        self.checkpoints.append(checkpoint)
+
+    def _dress(self, item):
+        item["_f"] = self._dress_frame
+        self.dressing.append(item)
+
+    def _last_point(self):
+        """The last route point on the way the cursor is going: inside a fork's branch, the
+        other branch's points are not behind it."""
+        for point in reversed(self.route):
+            if point.get("branch", 0) in (0, self.branch):
+                return point
+        return None
+
+    def _last_z(self):
+        """The z of the last route point in this frame (one placed before a turn carried into
+        it), or far behind when there is none."""
+        last = self._last_point()
+        if last is None:
+            return 1e9
+        if last["_f"] == self.f:
+            return last["at"][2]
+        wx, wz = self._world(last["_f"], last["at"][0], last["at"][2])
+        return self._local(self.f, wx, wz)[1]
+
     def point(self, z, x=None, y=None, **flags):
-        self.route.append({"at": v(self.x if x is None else x, self.y if y is None else y, z), **flags})
-        self.spine.append((z, self.x if x is None else x, self.y if y is None else y))
+        self._route({"at": v(self.x if x is None else x, self.y if y is None else y, z), **flags})
+        self._spine((z, self.x if x is None else x, self.y if y is None else y))
 
     def deck(self, length, width=6.0, role="deck", thick=1.0, x=None):
         """Ground from the cursor forward `length` metres, its top at the cursor's height."""
@@ -99,7 +154,7 @@ class Course:
         the side of the deck, ran at the take-off point on a diagonal and jumped sideways off
         the first ball every time. Only when it is ahead of the last point: behind it, the
         runner would turn round for it."""
-        last = self.route[-1]["at"][2] if self.route else 1e9
+        last = self._last_z()
         if last > self.z + metres + 0.8:
             self.point(self.z + metres)
 
@@ -108,11 +163,11 @@ class Course:
         or past it: a run-out ends with a point 1.5 m short of its edge, and a stand point half
         a metre BEHIND that one was reached the moment the first was, so the runner never
         slowed for it and jumped onto Trapdoor Run's tiles at a run, two rows too far."""
-        last = self.route[-1]["at"][2] if self.route else 1e9
+        last = self._last_z()
         if last > z + 0.3:
             self.point(z, reach=reach)
         else:
-            self.route[-1]["reach"] = reach
+            self._last_point()["reach"] = reach
 
     def gap(self, length, rise=0.0, dx=0.0):
         """A jump: a point just short of the edge that says jump, and the gap itself."""
@@ -128,7 +183,7 @@ class Course:
 
     def checkpoint(self, width=6.0, back=1.6):
         """A checkpoint across the ground just placed, `back` metres from its edge."""
-        self.checkpoints.append({"at": v(self.x, self.y, self.z + back), "size": v(width, 4.0, 2.4)})
+        self._checkpoint({"at": v(self.x, self.y, self.z + back), "size": v(width, 4.0, 2.4)})
 
     def safe(self, length=9.0, width=6.0):
         """Plain deck with a checkpoint near its START: a runner put back here has the rest of
@@ -187,12 +242,12 @@ class Course:
         side = self.x - size / 2 + 2.9
         # Straight on first, then out to the side: a diagonal from the narrower ground before
         # cut across its corner and into the water.
-        self.route.append({"at": v(self.x, self.y, z0 - 0.8)})
-        self.route.append({"at": v(side, self.y, z0 - 2.2)})
+        self._route({"at": v(self.x, self.y, z0 - 0.8)})
+        self._route({"at": v(side, self.y, z0 - 2.2)})
         # And back to the middle well short of the far edge, so whatever comes next is run at
         # straight: back to the middle at the edge itself, the jump that follows went sideways.
-        self.route.append({"at": v(side, self.y, self.z + 3.4)})
-        self.route.append({"at": v(self.x, self.y, self.z + 1.6)})
+        self._route({"at": v(side, self.y, self.z + 3.4)})
+        self._route({"at": v(self.x, self.y, self.z + 1.6)})
         # And four metres of plain deck after it: the arms reach to within 0.3 m of the edge,
         # and a stand-in hopping the last one came down two metres to the side of the jump
         # that followed and took it sideways into the water.
@@ -211,7 +266,7 @@ class Course:
         z = self.z - first
         for i in range(count):
             self.add(kind="ball", at=v(self.x, self.y + lift - radius, z), radius=radius, role="hazard")
-            self.route.append({"at": v(self.x, self.y + lift, z), "jump": True, "reach": 0.75})
+            self._route({"at": v(self.x, self.y + lift, z), "jump": True, "reach": 0.75})
             z -= spacing
         self.z = z + spacing - last
         self.point(self.z - 1.2)
@@ -238,7 +293,7 @@ class Course:
             x = self.x + (-swing if i % 2 == 0 else swing)
             self.add(kind="turntable", at=v(x, self.y - 0.3, z), radius=radius, thickness=0.6,
                      speed=speed if i % 2 == 0 else -speed, role="hazard")
-            self.route.append({"at": v(x, self.y, z), "jump": True, "reach": 0.7, "onward": True})
+            self._route({"at": v(x, self.y, z), "jump": True, "reach": 0.7, "onward": True})
             z -= spacing
         self.z = z + spacing - radius - last
         self.point(self.z - 1.2)
@@ -255,28 +310,43 @@ class Course:
         # things to land on: a stand-in runs from the wait point and jumps at whichever edge it
         # reaches, and stays on the mover until the far side is in reach.
         self.stand(near + 2.0)
-        self.route.append({"at": v(start[0], self.y, start[2]), "board": True, "ride": True,
+        self._route({"at": v(start[0], self.y, start[2]), "board": True, "ride": True,
                            "reach": 0.9})
-        self.route.append({"at": v(self.x + dx, self.y, far - 1.4), "board": True, "reach": 0.9})
+        self._route({"at": v(self.x + dx, self.y, far - 1.4), "board": True, "reach": 0.9})
         self.z = far
         self.x += dx
 
     def turntable(self, radius=5.0, speed=35.0, spinner_speed=0.0):
-        """A disc that turns. Across the middle is steady; the rim is a ride."""
-        self.lead_in()
-        self.point(self.z + 0.6, jump=True, reach=0.55)
+        """A disc that turns. Across the middle is steady; the rim is a ride.
+
+        With a spinner on it the way across is 1.6 m off the middle, round the hub, and the
+        jump onto it is taken on that line: taken down the middle, a stand-in in the air
+        steered sideways at the point beside it, came down running across the disc at six
+        metres a second and went off its side (Spin Cycle, a field of eight, sixteen falls)."""
+        # The arms against the disc, not with it: an arm turning nearly as the disc does sits
+        # on a rider and pushes them round with it, too slowly to hop (a disc at 40 with arms
+        # at 50 put seventeen of a field of sixteen in the water).
+        if spinner_speed and abs(spinner_speed - speed) < 60.0:
+            raise SystemExit("%s: a spinner on a turntable turns within 60 degrees a second of it" % self.doc["id"])
+        off = -1.6 if spinner_speed else 0.0
+        if off:
+            self.point(self.z + 3.5, x=self.x + off)
+            self.point(self.z + 0.6, x=self.x + off, jump=True, reach=0.55)
+        else:
+            self.lead_in()
+            self.point(self.z + 0.6, jump=True, reach=0.55)
         centre_z = self.z - 1.4 - radius
         self.add(kind="turntable", at=v(self.x, self.y - 0.3, centre_z), radius=radius,
                  thickness=0.6, speed=speed)
         if spinner_speed:
             self.add(kind="spinner", at=v(self.x, self.y, centre_z), arm_length=radius - 0.2,
                      arm_height=0.6, speed=spinner_speed, arms=2, hub_radius=0.5)
-            self.route.append({"at": v(self.x - 1.6, self.y, centre_z + radius - 1.2)})
-            self.route.append({"at": v(self.x - 1.6, self.y, centre_z - radius + 1.2), "jump": True,
+            self._route({"at": v(self.x - 1.6, self.y, centre_z + radius - 1.2)})
+            self._route({"at": v(self.x - 1.6, self.y, centre_z - radius + 1.2), "jump": True,
                                "reach": 0.6})
         else:
-            self.route.append({"at": v(self.x, self.y, centre_z + radius - 1.0)})
-            self.route.append({"at": v(self.x, self.y, centre_z - radius + 1.0), "jump": True,
+            self._route({"at": v(self.x, self.y, centre_z + radius - 1.0)})
+            self._route({"at": v(self.x, self.y, centre_z - radius + 1.0), "jump": True,
                                "reach": 0.6})
         self.z = centre_z - radius - 1.4
         self.point(self.z - 1.2)
@@ -299,8 +369,8 @@ class Course:
                      duty=0.35, phase=0.27 * i)
             self.add(kind="box", at=v(rest_x + side * 1.1, self.y + 0.8, z), size=v(0.6, 2.6, 2.0),
                      role="pillar")
-            self.route.append({"at": v(self.x, self.y, z + 2.4), "wait": True, "reach": 0.7})
-        self.route.append({"at": v(self.x, self.y, self.z + 1.0)})
+            self._route({"at": v(self.x, self.y, z + 2.4), "wait": True, "reach": 0.7})
+        self._route({"at": v(self.x, self.y, self.z + 1.0)})
 
     def pendulums(self, width=3.0, count=3, period=3.0, swing=55.0, step=4.2, length=None, radius=0.95):
         """A beam with hammers swinging across it, a step apart, and room between them.
@@ -314,8 +384,8 @@ class Course:
             z = z0 - step * (i + 1)
             self.add(kind="pendulum", pivot=v(self.x, self.y + 6.2, z), length=5.0, radius=radius,
                      swing=swing, period=period, phase=0.31 * i, yaw=0.0)
-            self.route.append({"at": v(self.x, self.y, z + step / 2), "wait": True, "reach": 0.7})
-        self.route.append({"at": v(self.x, self.y, self.z + 1.0)})
+            self._route({"at": v(self.x, self.y, z + step / 2), "wait": True, "reach": 0.7})
+        self._route({"at": v(self.x, self.y, self.z + 1.0)})
 
     def tiles(self, cols=3, rows=4, tile=2.0, period=3.2, down=0.28, seed=1):
         """A grid of tiles, each of which drops out on its own schedule and comes back."""
@@ -329,7 +399,7 @@ class Course:
                  tile=tile, gap=gap, thickness=0.5, period=period, down=down, seed=seed)
         for row in range(rows):
             z = z0 - tile / 2 - row * pitch
-            self.route.append({"at": v(self.x, self.y, z), "board": True, "reach": 0.6})
+            self._route({"at": v(self.x, self.y, z), "board": True, "reach": 0.6})
         self.z = z0 - depth - 1.2
         self.point(self.z - 1.2, board=True)
 
@@ -344,7 +414,7 @@ class Course:
         for i in range(count):
             self.add(kind="roller", at=v(self.x, self.y - radius, z), length=length, radius=radius,
                      speed=speed if i % 2 == 0 else -speed)
-            self.route.append({"at": v(self.x, self.y, z), "jump": True, "reach": 0.75})
+            self._route({"at": v(self.x, self.y, z), "jump": True, "reach": 0.75})
             z -= spacing
         self.z = z + spacing - last
         self.point(self.z - 1.2)
@@ -357,7 +427,7 @@ class Course:
             centre = self.z - length / 2
             self.add(kind="seesaw", at=v(self.x, self.y - 0.25, centre), size=v(width, 0.5, length),
                      amplitude=amplitude, period=period, phase=0.33 * i)
-            self.route.append({"at": v(self.x, self.y, centre)})
+            self._route({"at": v(self.x, self.y, centre)})
             self.z -= length
         self.point(self.z - 1.2)
 
@@ -411,8 +481,8 @@ class Course:
             z = z0 - spacing * (i + 0.5) - 1.0
             self.add(kind="fall", at=v(self.x, self.y, z), size=v(width, height, 1.2), period=period,
                      duty=duty, phase=stagger * i, push=9.0, yaw=0.0 if i % 2 == 0 else 180.0, tint=tint)
-            self.route.append({"at": v(self.x, self.y, z + 2.4), "wait": True, "reach": 0.7})
-            self.spine.append((z + 2.4, self.x, self.y))
+            self._route({"at": v(self.x, self.y, z + 2.4), "wait": True, "reach": 0.7})
+            self._spine((z + 2.4, self.x, self.y))
         self.point(self.z + 1.0)
 
     def trampolines(self, count=3, power=10.0, pad=3.2, gap=3.0, first=2.6):
@@ -429,8 +499,8 @@ class Course:
         for i in range(count):
             self.add(kind="bouncer", at=v(self.x, self.y - 0.2, z), size=v(3.2, 0.4, pad), power=power)
             self.add(kind="box", at=v(self.x, self.y - 0.6, z), size=v(3.6, 0.5, pad + 0.4), role="pillar")
-            self.route.append({"at": v(self.x, self.y, z), "bounce": True, "reach": 1.2})
-            self.spine.append((z, self.x, self.y))
+            self._route({"at": v(self.x, self.y, z), "bounce": True, "reach": 1.2})
+            self._spine((z, self.x, self.y))
             z -= pad + gap
         self.z = z + pad + gap - pad / 2 - first
         self.point(self.z - 1.2)
@@ -447,42 +517,213 @@ class Course:
             "size": v(size, 4.0, 2.0),
             "lounge": v(self.x, self.y, self.z + size / 2 - 1.0),
         }
+        self._finish_f = self.f
         self.point(self.z + size / 2)
+
+    # --- turns, curves, climbs and forks ----------------------------------------
+    #
+    # [b]A course is a show, not a corridor.[/b] Every course used to run down one straight line;
+    # these bend it, lift it and split it, out of pieces every game build already has (a turn
+    # is a round deck, a climb a ramp), so a course that only turns plays on any mg-wipeout.
+    # A fork needs one from 2026-10-12 on: its document says `format` 2, which an older game
+    # refuses with a sentence instead of sending its stand-ins down both branches in turn.
+
+    def _world(self, f, x, z):
+        ox, oz, h = self.frames[f]
+        if f == 0:
+            return x, z
+        c, s = math.cos(math.radians(h)), math.sin(math.radians(h))
+        return ox + x * c + z * s, oz - x * s + z * c
+
+    def _local(self, f, wx, wz):
+        ox, oz, h = self.frames[f]
+        if f == 0:
+            return wx, wz
+        c, s = math.cos(math.radians(h)), math.sin(math.radians(h))
+        dx, dz = wx - ox, wz - oz
+        return dx * c - dz * s, dx * s + dz * c
+
+    def _pivot(self, x, z, angle):
+        """A new frame whose origin is local (x, z) of this one, turned by `angle` degrees."""
+        wx, wz = self._world(self.f, x, z)
+        self.frames.append((wx, wz, self.frames[self.f][2] + angle))
+        self.f = len(self.frames) - 1
+        self.x = 0.0
+        self.z = 0.0
+
+    def turn(self, angle, radius=4.5):
+        """A round deck where the course changes direction by `angle` degrees (positive turns
+        left, as a piece's `yaw` does). Round so any angle meets it cleanly: the deck before
+        and the deck after both run a metre into it. Two centimetres proud of them, so two
+        coplanar tops never fight over the same pixels.
+
+        A runner reaches the middle and turns there: at a run a stand-in carries about a metre
+        past a point it changes direction at, and the disc has four and a half."""
+        cz = self.z - radius + 1.0
+        self.add(kind="cylinder", at=v(self.x, self.y - 0.5 + 0.02, cz), radius=radius, height=1.0,
+                 role="deck")
+        self.point(cz, reach=1.0)
+        self._pivot(self.x, cz, angle)
+        self.z = -(radius - 1.0)
+
+    def curve(self, angle, length=16.0, steps=4, width=6.0):
+        """A bend: `steps` straight lengths of deck, each turned a share of `angle` at a round
+        joint (a disc as wide as the deck, which covers both the wedge a turned box leaves on
+        the inside and the one it overlaps on the outside). A point at every joint, so a
+        stand-in runs the arc rather than cutting its corner over the water."""
+        seg = length / steps
+        share = angle / float(steps)
+        for _ in range(steps):
+            self.deck(seg, width)
+            self.add(kind="cylinder", at=v(self.x, self.y - 0.5 + 0.02, self.z), radius=width / 2,
+                     height=1.0, role="deck")
+            self.point(self.z, reach=1.0)
+            self._pivot(self.x, self.z, share)
+
+    def kink(self, angle, width=6.0):
+        """A change of direction at the cursor with nothing but a round joint as wide as the
+        deck: the deck before ends at its middle and the deck after starts there. A point on
+        it, so a stand-in turns where the deck does."""
+        self.add(kind="cylinder", at=v(self.x, self.y - 0.5 + 0.02, self.z), radius=width / 2,
+                 height=1.0, role="deck")
+        self.point(self.z, reach=1.0)
+        self._pivot(self.x, self.z, angle)
+
+    def detour(self, out, back=None, angle=30.0, side=1, width=6.0):
+        """The long way round: off to `side` (+1 left) at `angle`, `out(course)` built on the
+        way out, a turn back of twice the angle, `back(course)` on the way back, padded to the
+        same length so the course comes back onto its own line, and a turn onto it. What a
+        fork's safe branch is made of: the same distance down the course takes longer."""
+        # Four and a half metres after each kink before anything: a stand-in turns at the kink
+        # and needs a run at whatever comes first (Trapdoor Run's trampolines, a metre and a
+        # half after one, were jumped from a standing start into the water forty times).
+        self.kink(side * angle, width)
+        self.deck(4.5, width)
+        out(self)
+        self.deck(2.0, width)
+        leg = -self.z
+        self.kink(-2.0 * side * angle, width)
+        if back is not None:
+            self.deck(4.5, width)
+            back(self)
+        self.leg_to(leg, radius=1.0, width=width)
+        self.kink(side * angle, width)
+
+    def u_turn(self, side=1, spacing=16.0, radius=4.5):
+        """Two turns of 90 degrees the same way: the course comes back alongside itself,
+        `spacing` metres over (centre to centre). A switchback is a climb, a u_turn, a climb.
+
+        Sixteen metres by default: a side sweeper's arm reaches ten metres from the line on
+        its own side, and the builder refuses a hazard that reaches another part of the
+        course (`_check_shape`)."""
+        self.turn(90.0 * side, radius)
+        self.deck(spacing - 2.0 * (radius - 1.0), 6.0)
+        self.turn(90.0 * side, radius)
+
+    def leg_to(self, length, radius=4.5, width=6.0):
+        """Plain deck to where the middle of a `turn` of `radius` would be `length` metres from
+        the middle of the turn this leg started at: how a spiral's sides are made shorter each
+        time round, whatever sections are on them."""
+        end = -length + (radius - 1.0)
+        if self.z < end - 0.01:
+            raise SystemExit("%s: a leg is already longer than %s m" % (self.doc["id"], length))
+        if self.z - end > 0.05:
+            self.deck(self.z - end, width)
+
+    def climb(self, length=10.0, rise=2.0, width=6.0):
+        """A plain ramp up (or down, with a negative rise): a height change with nothing on it
+        but the run. Under fifteen degrees, which a run takes without slowing."""
+        pitch = math.degrees(math.atan2(rise, length))
+        slope = math.hypot(length, rise)
+        centre = v(self.x, self.y + rise / 2 - 0.25 * math.cos(math.radians(pitch)), self.z - length / 2)
+        self.add(kind="ramp", at=centre, size=v(width, 0.5, slope), pitch=pitch, role="deck")
+        self.z -= length
+        self.y += rise
+        self.point(self.z + 0.6)
+
+    def fork(self, safe, risky, spread=9.0, width=6.0, depth=7.0):
+        """The way splits in two and joins again: `safe(course)` builds the left branch and
+        `risky(course)` the right, each from the far edge of a wide deck, on its own lane
+        `spread` metres to the side. The risky branch is meant to be the faster one; the
+        stand-ins take it by `wo_bot_risk`, harder ones more often.
+
+        Each branch must end facing the way it started and at the height it started; the
+        shorter is lengthened with plain deck so both meet one wide deck, where the course
+        goes on down the middle. No checkpoint inside a branch (the other branch never
+        crosses it): `_checkpoint` refuses one."""
+        full = 2.0 * spread + width
+        self.deck(depth, full)
+        self.point(self.z + depth - 2.0)
+        z0, x0, y0, f0 = self.z, self.x, self.y, self.f
+        ends = []
+        for number, (build, risky_branch, side) in enumerate(((safe, False, -1), (risky, True, 1)), start=1):
+            self.f, self.x, self.y, self.z = f0, x0 + side * spread, y0, z0
+            self.branch, self.risky = number, risky_branch
+            # Across the wide deck to the lane first: run straight from the middle at whatever
+            # the branch starts with, and the line crosses water beside the lane (Trapdoor
+            # Run's detour: ten falls a field at its first kink).
+            self.point(z0 + 1.5)
+            # And three metres of lane before the branch's own sections: the run from the middle
+            # comes onto the lane at an angle, and a jump three metres after it was taken
+            # sideways off Grand Tour's first ball by most of a field.
+            self.deck(3.0, width)
+            build(self)
+            if abs(((self.frames[self.f][2] - self.frames[f0][2]) + 180.0) % 360.0 - 180.0) > 0.01:
+                raise SystemExit("%s: a fork's branch ends facing another way" % self.doc["id"])
+            if abs(self.y - y0) > 0.01:
+                raise SystemExit("%s: a fork's branch ends at another height" % self.doc["id"])
+            wx, wz = self._world(self.f, self.x, self.z)
+            lx, lz = self._local(f0, wx, wz)
+            ends.append((number, risky_branch, lx, lz))
+        join = min(end[3] for end in ends)
+        for number, risky_branch, lx, lz in ends:
+            self.f, self.x, self.y, self.z = f0, lx, y0, lz
+            self.branch, self.risky = number, risky_branch
+            if lz - join > 0.05:
+                self.deck(lz - join, width)
+            self.point(join + 1.0)
+        self.branch, self.risky = 0, False
+        self.f, self.x, self.y, self.z = f0, x0, y0, join
+        self.deck(depth, full)
+        self.point(self.z + depth / 2)
+        self.doc["format"] = 2
 
     # --- the show -------------------------------------------------------------
 
-    def where(self, z):
-        """The course's (x, y) nearest to `z`, from the route."""
-        best = min(self.spine, key=lambda p: abs(p[0] - z))
+    def where(self, z, f=None):
+        """The course's (x, y) nearest to `z` in frame `f`, from the route."""
+        f = self._dress_frame if f is None else f
+        spine = [p for p in self.spine if p[3] == f] or self.spine
+        best = min(spine, key=lambda p: abs(p[0] - z))
         return best[1], best[2]
 
     def stands(self, z0, z1, side=1, rows=6, gap=7.0, text="", seed=1, tint=(0.95, 0.35, 0.25)):
         """A grandstand beside the course between z0 and z1, on `side` (+1 is +X), facing it."""
         mid = (z0 + z1) / 2
         x, y = self.where(mid)
-        self.dressing.append({"kind": "stands", "at": v(x + side * gap, y + 0.6, mid),
+        self._dress({"kind": "stands", "at": v(x + side * gap, y + 0.6, mid),
                               "size": v(abs(z1 - z0), rows * 0.55, rows * 0.9), "yaw": 90.0 if side > 0 else -90.0,
                               "seed": seed, "text": text, "tint": v(*tint)})
 
     def banner(self, z, side=1, gap=5.0, width=10.0, text="", tint=(0.95, 0.35, 0.25)):
         x, y = self.where(z)
-        self.dressing.append({"kind": "banner", "at": v(x + side * gap, y, z), "size": v(width, 1.6, 0.2),
+        self._dress({"kind": "banner", "at": v(x + side * gap, y, z), "size": v(width, 1.6, 0.2),
                               "yaw": 90.0 if side > 0 else -90.0, "text": text, "tint": v(*tint)})
 
     def lights(self, z, side=1, gap=12.0, height=14.0):
         x, y = self.where(z)
-        self.dressing.append({"kind": "lights", "at": v(x + side * gap, y, z), "size": v(3, height, 1),
+        self._dress({"kind": "lights", "at": v(x + side * gap, y, z), "size": v(3, height, 1),
                               "yaw": 90.0 if side > 0 else -90.0})
 
     def screen(self, z, side=1, gap=10.0, width=9.0, text="", tint=(0.98, 0.70, 0.18)):
         """A big screen beside the course, turned to face runners coming toward it."""
         x, y = self.where(z)
-        self.dressing.append({"kind": "screen", "at": v(x + side * gap, y, z), "size": v(width, width * 0.45, 0.4),
+        self._dress({"kind": "screen", "at": v(x + side * gap, y, z), "size": v(width, width * 0.45, 0.4),
                               "yaw": 180.0 - 25.0 * side, "text": text, "tint": v(*tint)})
 
     def flags(self, z, side=1, gap=5.5, length=18.0, seed=1):
         x, y = self.where(z)
-        self.dressing.append({"kind": "flags", "at": v(x + side * gap, y, z), "size": v(length, 5, 0.2),
+        self._dress({"kind": "flags", "at": v(x + side * gap, y, z), "size": v(length, 5, 0.2),
                               "yaw": 90.0 if side > 0 else -90.0, "seed": seed})
 
     def event(self, tint=(0.95, 0.35, 0.25), every=45.0, text="WIPEOUT"):
@@ -490,6 +731,10 @@ class Course:
         towers between them, flags at the start, a screen at the start and one before the
         finish, and banners on the stands' backs. Placed after the course is built, from its
         route, so a course's dressing follows its shape."""
+        self._dress_frame = 0
+        if len(self.frames) > 1:
+            self._event_turning(tint, every, text)
+            return
         end = self.z
         self.flags(-10.0, side=1, seed=3)
         self.flags(-10.0, side=-1, seed=7)
@@ -506,42 +751,190 @@ class Course:
         self.screen(end + 18.0, side=1, gap=12.0)
         self.stands(end + 14.0, end - 6.0, side=-1, rows=8, seed=seed + 1, text="FINISH", tint=tint)
 
-    def _hazards_near(self, at):
+    def _clear(self, f, x0, x1, z0, z1, margin=3.0):
+        """Whether the rectangle (local to frame `f`) is clear of the course: no route point and
+        no piece within `margin` of it, so a grandstand never stands on the next leg."""
+        lo_x, hi_x = min(x0, x1) - margin, max(x0, x1) + margin
+        lo_z, hi_z = min(z0, z1) - margin, max(z0, z1) + margin
+        for item in self.route + self.pieces:
+            at = item.get("at", item.get("pivot", item.get("from")))
+            wx, wz = self._world(item["_f"], at[0], at[2])
+            lx, lz = self._local(f, wx, wz)
+            if lo_x <= lx <= hi_x and lo_z <= lz <= hi_z:
+                return False
+        return True
+
+    def _event_turning(self, tint, every, text):
+        """`event` for a course that turns: stands down each straight long enough for one, on
+        whichever side is clear of every other part of the course, a light tower behind each.
+        Nothing is placed where it would stand on another leg; a course coiled tight gets
+        fewer stands, never one in the way."""
+        self.flags(-10.0, side=1, seed=3)
+        self.flags(-10.0, side=-1, seed=7)
+        if self._clear(0, -12.0, -16.0, -10.0, -18.0):
+            self.screen(-14.0, side=-1, gap=12.0, text="")
+        seed = 1
+        side = 1
+        last_f = self.f
+        for f in range(len(self.frames)):
+            zs = [p[0] for p in self.spine if p[3] == f]
+            if not zs:
+                continue
+            top = min(max(zs), -18.0) if f == 0 else max(zs)
+            bottom = min(zs) + (12.0 if f == last_f else 0.0)
+            z = top - 2.0
+            self._dress_frame = f
+            while z - 26.0 > bottom:
+                x, _ = self.where(z - 13.0)
+                for s in (side, -side):
+                    if self._clear(f, x + s * 5.5, x + s * 14.5, z, z - 30.0):
+                        self.stands(z, z - 26.0, side=s, seed=seed, text=text, tint=tint)
+                        self.lights(z - 30.0, side=s, gap=13.0)
+                        seed += 1
+                        side = -s
+                        break
+                z -= every
+        self._dress_frame = last_f
+        end = self.z
+        x, _ = self.where(end + 4.0)
+        for s in (-1, 1):
+            if self._clear(last_f, x + s * 5.5, x + s * 14.5, end + 14.0, end - 6.0):
+                self.stands(end + 14.0, end - 6.0, side=s, rows=8, seed=seed + 1, text="FINISH", tint=tint)
+                break
+        for s in (1, -1):
+            if self._clear(last_f, x + s * 10.0, x + s * 15.0, end + 15.0, end + 21.0):
+                self.screen(end + 18.0, side=s, gap=12.0)
+                break
+        self._dress_frame = 0
+
+    # --- the document -----------------------------------------------------------
+
+    def _to_world(self, item, keys=("at", "from", "to", "pivot"), turn_yaw=True):
+        f = item.pop("_f", 0)
+        h = self.frames[f][2]
+        if f == 0:
+            return
+        for key in keys:
+            if key in item:
+                x, y, z = item[key]
+                wx, wz = self._world(f, x, z)
+                item[key] = v(wx, y, wz)
+        if turn_yaw and h:
+            yaw = (item.get("yaw", 0.0) + h + 180.0) % 360.0 - 180.0
+            item["yaw"] = r(0.0 if abs(yaw) < 0.005 else yaw)
+
+    def _hazards_near(self, at, margin=1.2):
         """The hazards whose reach includes `at`, with a metre to spare: a checkpoint (where a
         fall puts you back) must be in none. One was, on the first long First Splash: the
         restart was at the far end of the sweeper's arc and a stand-in was knocked in again as
-        it stood up."""
+        it stood up. Along and across each hazard's own frame, so it holds round a turn."""
         near = []
         for piece in self.pieces:
             kind = piece["kind"]
+            if kind not in ("spinner", "pendulum", "pusher", "fall"):
+                continue
+            anchor = piece.get("at", piece.get("pivot"))
+            h = math.radians(piece["_h"])
+            dx, dz = at[0] - anchor[0], at[2] - anchor[2]
+            across = dx * math.cos(h) - dz * math.sin(h)
+            along = dx * math.sin(h) + dz * math.cos(h)
+            if abs(at[1] - anchor[1]) > 3.5 and kind != "pendulum":
+                continue
             if kind == "spinner":
-                hub = piece["at"]
-                if math.hypot(at[0] - hub[0], at[2] - hub[2]) < piece["arm_length"] + 1.0:
+                if math.hypot(dx, dz) < piece["arm_length"] + margin - 0.2:
                     near.append(piece)
             elif kind == "pendulum":
-                if abs(at[2] - piece["pivot"][2]) < piece["radius"] + 1.2:
+                if abs(along) < piece["radius"] + margin and abs(across) < 8.0 and abs(at[1] - anchor[1]) < 8.0:
                     near.append(piece)
-            elif kind == "pusher":
-                if abs(at[2] - piece["at"][2]) < piece["size"][2] / 2 + 1.2:
-                    near.append(piece)
-            elif kind == "fall":
-                if abs(at[2] - piece["at"][2]) < piece["size"][2] / 2 + 1.2:
+            elif kind in ("pusher", "fall"):
+                if abs(along) < piece["size"][2] / 2 + margin and abs(across) < 8.0:
                     near.append(piece)
         return near
 
+    def _along(self):
+        """How far along the route each point is, metres, walking each branch of a fork from
+        the point before it; the point after a fork is as far as its shorter branch."""
+        along = []
+        last = {}
+        fork_from = 0
+        for i, point in enumerate(self.route):
+            b = point.get("branch", 0)
+            if i == 0:
+                along.append(0.0)
+                continue
+            if b:
+                prev = last.get(b, fork_from)
+                along.append(along[prev] + math.dist(self.route[prev]["at"], point["at"]))
+                last[b] = i
+                continue
+            if last:
+                along.append(min(along[j] + math.dist(self.route[j]["at"], point["at"]) for j in last.values()))
+                last = {}
+            else:
+                along.append(along[i - 1] + math.dist(self.route[i - 1]["at"], point["at"]))
+            fork_from = i
+        return along
+
+    def _check_shape(self):
+        """Refuses a course that runs into itself: two parts of the route closer than seven
+        metres across (at any height under twelve) that are thirty metres apart along it, or a hazard that
+        reaches a part of the route it was not placed on. A turning course can lay a leg
+        beside another; this is what keeps it from laying one ON another."""
+        along = self._along()
+        for i in range(len(self.route)):
+            for j in range(i + 1, len(self.route)):
+                a, b = self.route[i], self.route[j]
+                if a.get("branch", 0) and b.get("branch", 0):
+                    continue
+                if along[j] - along[i] < 30.0:
+                    continue
+                pa, pb = a["at"], b["at"]
+                # Above or below counts too: a leg laid over another hides it from the camera and
+                # drops whoever falls off it onto a part of the course already run.
+                if math.hypot(pa[0] - pb[0], pa[2] - pb[2]) < 7.0 and abs(pa[1] - pb[1]) < 12.0:
+                    raise SystemExit("%s: the route at %s runs into itself at %s" % (self.doc["id"], pa, pb))
+        for piece in self.pieces:
+            if piece["kind"] not in ("spinner", "pendulum", "pusher", "fall"):
+                continue
+            home = along[min(piece["_r"], len(along) - 1)]
+            for j, point in enumerate(self.route):
+                if abs(along[j] - home) < 25.0:
+                    continue
+                if piece in self._hazards_near(point["at"], margin=0.6):
+                    raise SystemExit("%s: a %s at %s reaches the route at %s" % (
+                        self.doc["id"], piece["kind"], piece.get("at", piece.get("pivot")), point["at"]))
+
     def build(self):
+        for piece in self.pieces:
+            piece["_h"] = self.frames[piece["_f"]][2]
+            self._to_world(piece)
+        for point in self.route:
+            self._to_world(point, turn_yaw=False)
+        for checkpoint in self.checkpoints:
+            self._to_world(checkpoint)
+        for item in self.dressing:
+            self._to_world(item)
+        finish = self.doc["finish"]
+        finish["_f"] = getattr(self, "_finish_f", 0)
+        self._to_world(finish, keys=("at", "lounge"))
+        if "yaw" in finish:
+            # The finish's own fields in the order a straight course writes them, then its turn.
+            finish["yaw"] = finish.pop("yaw")
         for checkpoint in self.checkpoints:
             near = self._hazards_near(checkpoint["at"])
             if near:
                 raise SystemExit("%s: the checkpoint at %s is in reach of %s" % (
                     self.doc["id"], checkpoint["at"], ", ".join(p["kind"] for p in near)))
+        self._check_shape()
+        for piece in self.pieces:
+            piece.pop("_h", None)
+            piece.pop("_r", None)
         self.doc["pieces"] = self.pieces
         self.doc["checkpoints"] = self.checkpoints
         self.doc["route"] = self.route
         if self.dressing:
             self.doc["dressing"] = self.dressing
         return self.doc
-
 
 THEMES = {
     "noon": {"sky": [0.42, 0.66, 0.92], "horizon": [0.80, 0.88, 0.95], "water": [0.12, 0.45, 0.62]},
@@ -569,33 +962,49 @@ THEMES = {
 
 def first_splash():
     c = Course("wo_first_splash", "First Splash",
-               "The premiere, in front of a full house: a little of everything, gently, and then not so gently.",
+               "The premiere, in front of a full house: a little of everything, gently, round the bay and up the hill, and then not so gently.",
                THEMES["noon"], seconds=300.0)
     c.run_out(8)
     c.gap(2.4)
     c.deck(6)
     c.side_sweeper(length=14, speed=60)
     c.safe(9)
+    # Round to the right, along the front of the stands.
+    c.turn(-90)
+    c.deck(4)
     c.balls(count=3)
     c.deck(6)
     c.waterfalls(count=2, period=3.4, duty=0.35)
     c.safe(9)
     c.mover_crossing(length=9, period=6.0)
-    c.deck(6)
+    c.deck(4)
+    # And back the way the course started, in a long bend.
+    c.curve(90, length=16, steps=4)
+    c.deck(4)
     c.trampolines(count=3)
     c.safe(9)
+    # Up the hill, where the hammers are.
+    c.climb(length=10, rise=2.0)
+    c.deck(3)
     c.pendulums(width=3.4, count=2, period=3.2)
     c.deck(4)
     c.high_sweeper(length=14, speed=55, side=-1)
     c.safe(9)
+    c.turn(90)
+    c.deck(4)
     c.lily_pads(count=3, speed=45)
     c.deck(5)
     c.rollers(count=2, speed=60.0)
     c.safe(9)
     c.tiles(cols=3, rows=3, period=3.4, down=0.24, seed=5)
     c.deck(5)
+    c.turn(-90)
+    c.deck(4)
     c.side_sweeper(length=13, speed=75, arms=2, side=-1, phase=30)
     c.safe(9)
+    # Down off the hill to the water's edge for the last of it.
+    c.climb(length=10, rise=-2.0)
+    c.deck(3)
     c.waterfalls(count=3, period=3.2, duty=0.38, slime=True)
     c.deck(4)
     c.seesaws(count=2, amplitude=12, period=4.2)
@@ -610,7 +1019,7 @@ def first_splash():
 
 def spin_cycle():
     c = Course("wo_spin_cycle", "Spin Cycle",
-               "Turntables, and arms that turn on top of them. Nothing here stands still.",
+               "Turntables, and arms that turn on top of them, and a course that turns with them. Nothing here stands still.",
                THEMES["lagoon"], seconds=300.0)
     c.run_out(6)
     c.turntable(radius=5.0, speed=30.0)
@@ -618,21 +1027,33 @@ def spin_cycle():
     c.centre_spinner(size=11, speed=65)
     c.gap(2.4)
     c.safe(9)
+    c.turn(90)
+    c.deck(4)
     c.turntable(radius=5.5, speed=-40.0, spinner_speed=55.0)
     c.deck(6)
     c.lily_pads(count=4, speed=50)
     c.safe(9)
+    c.curve(-90, length=16, steps=4)
+    c.deck(4)
     c.side_sweeper(length=12, speed=95, arms=3)
     c.gap(2.6)
     c.deck(5)
     c.centre_spinner(size=12, speed=75, arms=3, phase=30)
     c.gap(2.2)
     c.safe(9)
+    c.turn(-90)
+    c.deck(4)
     c.turntable(radius=6.0, speed=45.0, spinner_speed=-60.0)
     c.deck(5)
     c.side_sweeper(length=14, speed=80, arms=2, side=-1, phase=60)
     c.safe(9)
+    c.turn(90)
+    c.deck(4)
     c.lily_pads(count=5, speed=50)
+    c.deck(4)
+    c.turntable(radius=5.0, speed=-35.0)
+    c.safe(9)
+    c.turntable(radius=5.5, speed=40.0, spinner_speed=-55.0)
     c.deck(4)
     c.gap(2.6)
     c.finish()
@@ -641,7 +1062,7 @@ def spin_cycle():
 
 def big_balls():
     c = Course("wo_big_balls", "Big Balls",
-               "Five sets of balls, each set bigger and further apart, wrecking balls between them, and the stands loving every splash.",
+               "Six sets of balls round the bay and up the hill, each set bigger and further apart, wrecking balls between them, and the stands loving every splash.",
                THEMES["peach"], seconds=300.0)
     c.run_out(8)
     c.balls(count=3, radius=1.4)
@@ -650,6 +1071,8 @@ def big_balls():
     c.deck(2)
     c.balls(count=4, radius=1.6)
     c.safe(9)
+    c.turn(-90)
+    c.deck(4)
     c.trampolines(count=2)
     c.deck(5)
     c.balls(count=3, radius=1.8)
@@ -658,12 +1081,22 @@ def big_balls():
     c.deck(2)
     c.balls(count=5, radius=1.6)
     c.safe(9)
+    c.curve(90, length=16, steps=4)
+    c.deck(4)
+    c.climb(length=10, rise=2.0)
+    c.deck(4)
     c.waterfalls(count=2, period=3.0, duty=0.4)
     c.deck(2)
     c.balls(count=4, radius=1.8, spacing=4.0)
     c.safe(9)
     c.side_sweeper(length=14, speed=70, arms=2)
-    c.deck(3)
+    c.safe(9)
+    c.turn(90)
+    c.deck(4)
+    c.balls(count=4, radius=1.6)
+    c.deck(4)
+    c.climb(length=10, rise=-2.0)
+    c.safe(9)
     c.balls(count=6, radius=1.7, spacing=3.8)
     c.deck(4)
     c.finish()
@@ -704,28 +1137,60 @@ def punch_alley():
 
 def trapdoor_run():
     c = Course("wo_trapdoor_run", "Trapdoor Run",
-               "Floors that drop out from under you, rides across the gaps between them, and pads that throw you on.",
+               "Floors that drop out from under you, rides across the gaps between them, pads that throw you on, and at every fork the choice: the long jumps or the spinning pads straight across, or the long way round on the rides.",
                THEMES["mint"], seconds=330.0)
     c.run_out(8)
     c.tiles(cols=3, rows=4, period=3.4, down=0.25, seed=3)
     c.safe(9)
     c.mover_crossing(length=10, period=6.5)
     c.deck(5)
-    c.tiles(cols=4, rows=5, period=2.8, down=0.28, seed=11)
+
+    def by_ride(k):
+        k.deck(4)
+        k.detour(lambda d: d.mover_crossing(length=9, period=7.0),
+                 lambda d: d.mover_crossing(length=8, period=6.5, phase=0.5), angle=35.0)
+        k.deck(3)
+
+    def by_the_long_jumps(k):
+        k.deck(5)
+        k.gap(3.0)
+        k.deck(3)
+        k.gap(3.2)
+        k.deck(3)
+        k.gap(3.4)
+        k.deck(4)
+
+    c.fork(by_ride, by_the_long_jumps)
     c.safe(9)
     c.bouncer_up(rise=3.0)
     c.deck(6)
-    c.tiles(cols=3, rows=3, period=2.4, down=0.3, seed=29)
+    c.turn(90)
+    c.deck(4)
+    c.tiles(cols=3, rows=3, period=2.8, down=0.28, seed=29)
     c.safe(9)
     c.trampolines(count=3)
     c.deck(5)
     c.mover_crossing(length=11, period=7.0)
     c.safe(9)
-    c.tiles(cols=4, rows=6, period=3.0, down=0.28, seed=41)
-    c.safe(9)
-    c.mover_crossing(length=9, period=5.5)
+    c.turn(-90)
     c.deck(4)
-    c.tiles(cols=3, rows=4, period=2.6, down=0.3, seed=53)
+
+    def round_by_ride(k):
+        k.deck(4)
+        k.detour(lambda d: d.trampolines(count=2),
+                 lambda d: d.mover_crossing(length=9, period=7.0), angle=35.0)
+        k.deck(3)
+
+    def over_the_pads(k):
+        k.deck(4)
+        k.lily_pads(count=4, speed=45)
+        k.deck(3)
+
+    c.fork(round_by_ride, over_the_pads)
+    c.safe(9)
+    c.climb(length=14, rise=-3.0)
+    c.safe(9)
+    c.tiles(cols=3, rows=4, period=3.0, down=0.28, seed=53)
     c.deck(4)
     c.finish()
     return c.build()
@@ -769,31 +1234,41 @@ def log_roll():
 
 def the_sweeper():
     c = Course("wo_the_sweeper", "The Sweeper",
-               "Low arms to jump and high arms to duck, from both sides, faster every time, with a crowd that wants to see you go in.",
+               "Low arms to jump and high arms to duck, from both sides, round every corner and faster every time, with a crowd that wants to see you go in.",
                THEMES["dusk"], seconds=300.0)
     c.run_out(8)
     c.side_sweeper(length=12, speed=60, height=0.55)
     c.gap(2.2)
     c.side_sweeper(length=12, speed=75, height=0.55, arms=3, phase=40, side=-1)
     c.safe(9)
-    c.high_sweeper(length=14, speed=60, arms=2)
+    c.turn(90)
+    c.deck(4)
+    c.high_sweeper(length=14, speed=60, arms=2, side=-1)
     c.gap(2.2)
     c.centre_spinner(size=12, speed=80, height=0.6, arms=3)
     c.gap(2.4)
     c.safe(9)
+    c.turn(-90)
+    c.deck(4)
     c.side_sweeper(length=13, speed=90, height=0.55, arms=2, phase=90)
     c.deck(3)
     c.high_sweeper(length=14, speed=70, arms=2, side=-1, phase=45)
     c.safe(9)
+    c.curve(-90, length=16, steps=4)
+    c.deck(4)
     c.centre_spinner(size=12, speed=85, height=0.6, arms=3, phase=30)
     c.gap(2.2)
     c.deck(4)
     c.turntable(radius=5.5, speed=-35.0, spinner_speed=70.0)
     c.safe(9)
+    c.turn(90)
+    c.deck(4)
     c.side_sweeper(length=14, speed=100, height=0.55, arms=3, side=-1)
     c.deck(3)
-    c.high_sweeper(length=14, speed=80, arms=3, phase=20)
+    c.high_sweeper(length=14, speed=80, arms=3, phase=20, side=1)
     c.safe(9)
+    c.turn(90)
+    c.deck(4)
     c.centre_spinner(size=13, speed=95, height=0.6, arms=4, phase=10)
     c.gap(2.2)
     c.finish()
@@ -801,38 +1276,62 @@ def the_sweeper():
     return c.build()
 
 
+SPIRAL = (80.0, 70.0, 56.0)
+
+
 def uphill_belt():
     c = Course("wo_uphill_belt", "Uphill Belt",
-               "Up the belts, up the bouncers, through the falls and the hammers, and over the logs at the top.",
+               "Up the hill in switchbacks: up the belts, up the bouncers, through the falls and the hammers, then round the spiral to a finish on the summit.",
                THEMES["noon"], seconds=300.0)
     c.run_out(8)
     c.conveyor_climb(length=12, rise=2.0, speed=2.5)
     c.safe(9)
-    c.bouncer_up(rise=3.2)
-    c.deck(6)
+    c.pendulums(width=3.4, count=2, period=3.0)
+    c.deck(4)
+    # The first switchback: back down the hill alongside, a level up.
+    c.u_turn(side=1, spacing=18)
+    c.deck(4)
     c.conveyor_climb(length=14, rise=2.4, speed=3.2)
     c.safe(9)
-    c.pendulums(width=3.4, count=2, period=3.0)
     c.bouncer_up(rise=3.0)
-    c.safe(9)
+    c.deck(4)
     c.waterfalls(count=3, period=3.2, duty=0.4)
+    c.deck(4)
+    # The second: up the hill again, another level up.
+    c.u_turn(side=-1, spacing=18)
     c.deck(4)
     c.conveyor_climb(length=16, rise=2.8, speed=3.6)
     c.safe(9)
     c.flat_belt(length=14, speed=4.0)
     c.deck(3)
     c.pendulums(width=3.2, count=3, period=2.8, swing=60)
-    c.bouncer_up(rise=3.4)
     c.safe(9)
-    c.rollers(count=4, speed=70.0)
-    c.deck(4)
-    c.side_sweeper(length=14, speed=80, arms=2, side=-1)
+    # The spiral: four turns the same way round, each side shorter and higher than the one
+    # before, to the summit in the middle.
+    c.turn(90)
+    c.deck(3)
+    c.rollers(count=3, speed=70.0)
+    c.deck(3)
+    c.climb(length=10, rise=2.0)
     c.safe(9)
-    c.conveyor_climb(length=14, rise=2.2, speed=3.8)
-    c.deck(4)
+    c.leg_to(SPIRAL[0])
+    c.turn(90)
+    c.deck(3)
+    c.side_sweeper(length=14, speed=80, arms=2, side=1)
+    c.deck(3)
+    c.conveyor_climb(length=12, rise=2.2, speed=3.8)
+    c.safe(9)
+    c.leg_to(SPIRAL[1])
+    c.turn(90)
+    c.deck(3)
     c.pusher_alley(count=3, period=2.4)
+    c.deck(3)
+    c.bouncer_up(rise=3.0)
     c.safe(9)
-    c.trampolines(count=3)
+    c.leg_to(SPIRAL[2])
+    c.turn(90)
+    c.deck(3)
+    c.trampolines(count=2)
     c.deck(4)
     c.finish()
     return c.build()
@@ -840,7 +1339,7 @@ def uphill_belt():
 
 def hammer_gauntlet():
     c = Course("wo_hammer_gauntlet", "Hammer Gauntlet",
-               "Narrow beams under swinging hammers, wrecking balls, and rams along the way. The big crowd came for this one.",
+               "Narrow beams under swinging hammers, wrecking balls, and rams along the way, up to the high beam and down again. The big crowd came for this one.",
                THEMES["storm"], seconds=300.0)
     c.run_out(8)
     c.pendulums(width=3.0, count=3, period=3.0)
@@ -851,20 +1350,37 @@ def hammer_gauntlet():
     c.deck(5)
     c.pendulums(width=2.4, count=4, period=2.6, swing=60)
     c.safe(9)
+    c.turn(-90)
+    c.deck(4)
     c.pusher_alley(count=2, period=2.4)
     c.pendulums(width=2.4, count=2, period=2.2, swing=60)
     c.safe(9)
     c.pendulums(width=4.6, count=3, period=3.4, radius=1.5, swing=50)
     c.safe(9)
+    # Up to the high beam: the long one, with the water a long way down.
+    c.climb(length=12, rise=2.5)
+    c.deck(4)
     c.gap(2.2)
-    c.beam(length=10, width=1.4)
+    c.beam(length=12, width=1.4)
     c.gap(2.2)
+    c.safe(9)
+    c.turn(90)
     c.deck(4)
     c.pusher_alley(count=3, period=2.0)
     c.deck(3)
     c.pendulums(width=2.6, count=4, period=2.4, swing=62)
     c.safe(9)
+    c.climb(length=12, rise=-2.5)
+    c.deck(4)
     c.waterfalls(count=2, period=2.8, duty=0.4, slime=True)
+    c.deck(3)
+    c.turn(90)
+    c.deck(4)
+    c.pendulums(width=3.0, count=3, period=2.6, swing=58)
+    c.safe(9)
+    c.gap(2.2)
+    c.beam(length=10, width=1.4)
+    c.gap(2.2)
     c.deck(3)
     c.pendulums(width=4.6, count=2, period=3.0, radius=1.5, swing=55)
     c.deck(3)
@@ -875,7 +1391,7 @@ def hammer_gauntlet():
 
 def grand_tour():
     c = Course("wo_grand_tour", "Grand Tour",
-               "The long one, and the season's big night: a bit of everything, ten checkpoints and no time to stand still.",
+               "The long one, and the season's big night: round the whole bay and up the hill, a bit of everything, two forks to gamble on and no time to stand still.",
                THEMES["peach"], seconds=360.0)
     c.run_out(8)
     c.side_sweeper(length=12, speed=70)
@@ -885,14 +1401,29 @@ def grand_tour():
     c.deck(5)
     c.pusher_alley(count=2, period=2.4)
     c.safe(9)
-    c.rollers(count=3)
-    c.deck(5)
-    c.mover_crossing(length=9, period=6.0)
+    c.turn(90)
+    c.deck(4)
+
+    def by_the_rollers(k):
+        k.deck(3)
+        k.rollers(count=3)
+        k.deck(3)
+
+    def by_the_ferry(k):
+        k.deck(3)
+        k.detour(lambda d: d.mover_crossing(length=9, period=7.5),
+                 lambda d: d.mover_crossing(length=8, period=6.5, phase=0.3), angle=35.0)
+        k.deck(3)
+
+    # Safe is the left lane: the ferry is a wait; the logs are quicker if you stay on them.
+    c.fork(by_the_ferry, by_the_rollers)
     c.safe(9)
     c.tiles(cols=3, rows=4, period=3.2, down=0.25, seed=7)
     c.deck(5)
     c.pendulums(width=3.0, count=2, period=3.0)
     c.safe(9)
+    c.curve(-90, length=16, steps=4)
+    c.deck(4)
     c.waterfalls(count=3, period=3.0, duty=0.4)
     c.deck(4)
     c.trampolines(count=3)
@@ -903,15 +1434,24 @@ def grand_tour():
     c.deck(4)
     c.high_sweeper(length=14, speed=65, side=-1)
     c.safe(9)
-    c.seesaws(count=3, amplitude=12, period=4.0)
+    c.turn(-90)
     c.deck(4)
-    c.balls(count=4, radius=1.6)
+
+    def over_the_balls(k):
+        k.deck(3)
+        k.balls(count=3, radius=1.6)
+        k.deck(3)
+
+    def round_the_seesaws(k):
+        k.deck(3)
+        k.detour(lambda d: d.seesaws(count=3, amplitude=12, period=4.4), angle=35.0)
+        k.deck(3)
+
+    c.fork(round_the_seesaws, over_the_balls)
     c.safe(9)
-    c.flat_belt(length=12, speed=3.5)
-    c.deck(4)
     c.pusher_alley(count=3, period=2.2, reach=2.6)
     c.safe(9)
-    c.rollers(count=4, speed=80.0)
+    c.turn(90)
     c.deck(4)
     c.waterfalls(count=2, period=2.8, duty=0.42, slime=True)
     c.safe(9)
@@ -926,31 +1466,49 @@ def grand_tour():
 
 def lily_pond():
     c = Course("wo_lily_pond", "Lily Pond",
-               "Spinning pads to hop across, planks that tip you into the pond, waterfalls and a ferry to catch.",
+               "Round the pond on a winding path: spinning pads to hop across, planks that tip you in, waterfalls, and at the fork the ferry or the pads.",
                THEMES["mint"], seconds=300.0)
     c.run_out(8)
     c.lily_pads(count=4, speed=50)
     c.safe(9)
+    c.curve(60, length=12, steps=3)
+    c.deck(4)
     c.seesaws(count=2, amplitude=12, period=4.4)
     c.deck(5)
     c.mover_crossing(length=9, period=6.5)
     c.safe(9)
+    c.curve(-60, length=12, steps=3)
+    c.deck(4)
     c.lily_pads(count=5, speed=50, swing=0.4)
     c.safe(9)
     c.waterfalls(count=3, period=3.4, duty=0.38)
     c.deck(4)
     c.trampolines(count=2)
     c.safe(9)
-    c.lily_pads(count=6, speed=50, swing=0.4)
-    c.deck(5)
+    c.curve(-90, length=16, steps=4)
+    c.deck(4)
+
+    def by_ferry(k):
+        k.deck(3)
+        k.detour(lambda d: d.mover_crossing(length=10, period=7.5),
+                 lambda d: d.seesaws(count=1, amplitude=12, period=4.4), angle=35.0)
+        k.deck(3)
+
+    def by_pads(k):
+        k.deck(3)
+        k.lily_pads(count=6, speed=50, swing=0.4)
+        k.deck(3)
+
+    c.fork(by_ferry, by_pads)
+    c.safe(9)
     c.seesaws(count=3, amplitude=14, period=4.0)
     c.safe(9)
+    c.curve(90, length=16, steps=4)
+    c.deck(4)
     c.rollers(count=3, speed=60.0)
     c.deck(4)
     c.side_sweeper(length=13, speed=65, arms=2)
     c.safe(9)
-    c.mover_crossing(length=10, period=6.0)
-    c.deck(4)
     c.lily_pads(count=4, speed=50, swing=0.4)
     c.deck(4)
     c.gap(2.2)
