@@ -1076,7 +1076,19 @@ class Course:
         self.doc["route"] = self.route
         if self.dressing:
             self.doc["dressing"] = self.dressing
+        self.doc["toys"] = START_PEN_TOYS
         return self.doc
+
+
+# dot-props' toys, read by mg-wipeout (a game from before them ignores the field). Loose ones only,
+# by the family's rule for a competitive game: a person walks through a ball and pushes it, so it
+# never holds a runner up or covers anybody, where a pad or a trampoline would be a way past an
+# obstacle. A beach ball in each back corner of the start pen, to bat about while the gate is up;
+# the pen's walls keep them in, and one the field carries out and into the water goes home.
+START_PEN_TOYS = [
+    {"toy": "beach_ball", "at": [-3.8, 0.0, 2.8]},
+    {"toy": "beach_ball", "at": [3.8, 0.0, 2.8]},
+]
 
 THEMES = {
     "noon": {"sky": [0.42, 0.66, 0.92], "horizon": [0.80, 0.88, 0.95], "water": [0.12, 0.45, 0.62]},
@@ -1660,14 +1672,24 @@ def lily_pond():
 
 # --- The arenas --------------------------------------------------------------------
 
-def arena(aid, name, blurb, theme, pieces, spawns, drops, gallery, kill=-8.0):
-    return {
+def arena(aid, name, blurb, theme, pieces, spawns, drops, gallery, kill=-8.0, toys=()):
+    doc = {
         "format": 1, "kind": "arena", "id": aid, "name": name, "author": AUTHOR, "blurb": blurb,
         "theme": theme, "kill_height": kill, "pieces": pieces,
         "spawns": [{"at": v(*at), "size": v(*size)} for at, size in spawns],
         "drops": [{"at": v(*at), "size": v(*size)} for at, size in drops],
         "gallery": {"at": v(*gallery[0]), "size": v(*gallery[1])},
     }
+    if toys:
+        doc["toys"] = [{"toy": toy, "at": v(*at)} for toy, at in toys]
+    return doc
+
+
+# A finale's balls: a beach ball and a football on the floor, clear of the spawns and the drops,
+# for the fighters to shoot about, kick into the water and throw with a barrel's blast. Never
+# cover (the combat's trace does not see them) and never a step.
+def finale_balls(a, b):
+    return (("beach_ball", a), ("football", b))
 
 
 def box(at, size, role="arena", yaw=0.0):
@@ -1687,7 +1709,9 @@ def arenas():
         [((0, 0, -11), (4, 3)), ((0, 0, 11), (4, 3)), ((-11, 0, 0), (3, 4)), ((11, 0, 0), (3, 4)),
          ((8, 0, 8), (3, 3)), ((-8, 0, -8), (3, 3))],
         [((0, 0, 0), (14, 14))],
-        ((0, 6, 20), (16, 5))))
+        ((0, 6, 20), (16, 5)),
+        # Between the spawns, past the arm's reach.
+        toys=finale_balls((8, 0, -8), (-8, 0, 8))))
 
     # Four islands joined by narrow bridges: the bridges are where a thrown crate counts.
     islands = []
@@ -1700,7 +1724,9 @@ def arenas():
         islands,
         [((-9, 0, -9), (4, 4)), ((9, 0, 9), (4, 4)), ((9, 0, -9), (4, 4)), ((-9, 0, 9), (4, 4))],
         [((-9, 0, -9), (6, 6)), ((9, 0, 9), (6, 6)), ((9, 0, -9), (6, 6)), ((-9, 0, 9), (6, 6))],
-        ((0, 7, 22), (16, 5))))
+        ((0, 7, 22), (16, 5)),
+        # On two islands' inner corners, beside the bridges.
+        toys=finale_balls((-5.5, 0, -5.5), (5.5, 0, 5.5))))
 
     # A stepped pyramid: high ground in the middle, reached by steps a jump climbs.
     tiers = [box((0, -0.5, 0), (28, 1, 28)), box((0, 0.4, 0), (16, 0.8, 16)),
@@ -1711,7 +1737,9 @@ def arenas():
         [((-11, 0, -11), (4, 4)), ((11, 0, 11), (4, 4)), ((11, 0, -11), (4, 4)),
          ((-11, 0, 11), (4, 4))],
         [((0, 1.6, 0), (6, 6)), ((-10, 0, 0), (4, 12)), ((10, 0, 0), (4, 12))],
-        ((0, 7, 22), (16, 5))))
+        ((0, 7, 22), (16, 5)),
+        # On the bottom step, north and south.
+        toys=finale_balls((0, 0, -11), (0, 0, 11))))
 
     # A square with a hole in the middle and two movers that cross it.
     pit = [box((0, -0.5, -10), (26, 1, 6)), box((0, -0.5, 10), (26, 1, 6)),
@@ -1725,7 +1753,9 @@ def arenas():
         [((-10, 0, -10), (4, 3)), ((10, 0, 10), (4, 3)), ((10, 0, -10), (4, 3)),
          ((-10, 0, 10), (4, 3))],
         [((0, 0, -10), (18, 4)), ((0, 0, 10), (18, 4)), ((-10, 0, 0), (4, 10)), ((10, 0, 0), (4, 10))],
-        ((0, 7, 21), (16, 5))))
+        ((0, 7, 21), (16, 5)),
+        # On the side walks, to knock into the hole.
+        toys=finale_balls((-12, 0, 5.5), (12, 0, -5.5))))
 
     # The whole floor turns.
     out.append(arena("wo_arena_turntable", "Merry-Go-Round",
@@ -1736,6 +1766,9 @@ def arenas():
         [((0, 0, -9), (4, 3)), ((0, 0, 9), (4, 3)), ((-9, 0, 0), (3, 4)), ((9, 0, 0), (3, 4))],
         [((0, 0, 0), (12, 12))],
         ((0, 6, 19), (16, 5))))
+    # No balls on this one: the floor is moved by writing its transform, which carries a person
+    # (mg-wipeout's carry) but not a rigid body, so a ball sat still while the floor turned under
+    # it (measured: 0.08 m in half a turn).
 
     return out
 
