@@ -82,7 +82,7 @@
    "thickness": 0.5,
    "period": 3.4,
    "down": 0.25,
-   "seed": 3
+   "seed": 436
   },
   {
    "kind": "box",
@@ -519,7 +519,7 @@
    "thickness": 0.5,
    "period": 2.8,
    "down": 0.28,
-   "seed": 29,
+   "seed": 59,
    "yaw": 90.0
   },
   {
@@ -1111,7 +1111,7 @@
    "thickness": 0.5,
    "period": 3.0,
    "down": 0.28,
-   "seed": 53
+   "seed": 42
   },
   {
    "kind": "box",

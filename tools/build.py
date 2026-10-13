@@ -38,6 +38,142 @@ def v(*values):
     return [r(x) for x in values]
 
 
+# --- Trapdoor tiles: whether a column can be crossed ----------------------------
+#
+# [b]Every column of a grid crossable, with room.[/b] A tile's schedule is a hash of the grid's
+# seed and its index, so a seed can lay a column where one row comes back up just as the row
+# before it drops: Trapdoor Run's last grid (seed 53) had two columns nobody who kept to their
+# column could cross (a 0.1 s window), and a field of stand-ins funnelled into the third. This
+# is mg-wipeout's WoCourse.tile_cycle and tile_crossing_clear (a runner lined up on the column
+# at the stand point, setting off from a stand) and the same numbers, so the builder can
+# refuse a grid the game would have to work round. Keep the two in step.
+
+TILE_RUN = 7.0                  # WoConfig.run_speed
+TILE_WALK = 7.0 * 0.45          # run_speed * walk_speed_scale: the jump onto the first row
+TILE_START = 0.1                # WoGame.TILE_START_SECONDS
+TILE_SLOW = 0.9                 # WoCourse.TILE_SLOW
+TILE_MARGIN = 0.08              # WoCourse.TILE_MARGIN_SECONDS
+TILE_PLAYER_RADIUS = 0.35       # WoCourse.PLAYER_RADIUS
+TILE_PLAN_RATE = 16             # WoCourse.TILE_PLAN_RATE
+TILE_PLAN_SLOTS = 128           # WoCourse.TILE_PLAN_SLOTS
+
+TILE_TICK_RATE = 64             # WoGame.tick_rate
+
+# Seconds on end, once a period, that every column must be clear to set off for. Before this
+# check (2026-10-13) Trapdoor Run's last grid had two columns that never were and one for
+# 0.39 s, its turned grid one that never was, First Splash's grid one and Grand Tour's one for
+# 0.09 s; a field crossed in the others. The seeds chosen then give every column 0.72 to
+# 1.28 s.
+TILE_FAIR_WINDOW = 0.5
+
+
+def _mix(value):
+    """WoCourse._mix: a small integer hash, the same on every platform."""
+    x = (value ^ 0x5bd1e995) & 0x7fffffff
+    x = ((x >> 15) ^ x) * 0x2c1b3c6d & 0x7fffffff
+    x = ((x >> 12) ^ x) * 0x297a2d39 & 0x7fffffff
+    return ((x >> 15) ^ x) & 0x7fffffff
+
+
+def tile_cycle(spec, index, t):
+    """WoCourse.tile_cycle: where a tile is in its cycle, 0..1; it is down below `down`."""
+    offset = (_mix(int(spec["seed"]) * 7919 + index * 104729) % 1000) / 1000.0
+    return (t / spec["period"] + offset) % 1.0
+
+
+def _tile_up_over(spec, index, start, until):
+    cycle = tile_cycle(spec, index, start)
+    if cycle < spec["down"]:
+        return False
+    return (1.0 - cycle) * spec["period"] > until - start
+
+
+def _tile_stand(spec, index, standing, arrive, now, dt):
+    start = max(int(math.ceil(arrive / dt)), 0)
+    if start >= len(standing):
+        return
+    cycle = tile_cycle(spec, index, now + start * dt)
+    if cycle < spec["down"]:
+        return
+    until = min(start + int((1.0 - cycle) * spec["period"] / dt), len(standing))
+    for k in range(start, until):
+        standing[k] = max(standing[k], 1)
+    if until > start:
+        standing[start] = 2
+
+
+def tile_column_clear(spec, col, back, now):
+    """Whether a runner standing `back` metres before the grid's middle, lined up on column
+    `col`, who sets off at `now` seconds, gets over every row (WoCourse.tile_crossing_clear
+    asked from a deck, from a stand, with all of its margin). Rows are crossed toward the
+    grid's local -Z, which is the way the builder lays them."""
+    rows, cols, tile = spec["rows"], spec["cols"], spec["tile"]
+    pitch = tile + spec["gap"]
+    order = [(rows - 1 - k) * cols + col for k in range(rows)]
+    middles = [(k - (rows - 1) * 0.5) * pitch for k in range(rows)]
+    along = -back
+    half = tile * 0.5
+    dt = 1.0 / TILE_PLAN_RATE
+    near = middles[0] - half
+    walked = max(near - along, 0.0)
+    fast_on = now + max(near - TILE_PLAYER_RADIUS - along, 0.0) / TILE_WALK
+    slow_mid = now + TILE_START + walked / (TILE_WALK * TILE_SLOW) \
+        + max(middles[0] - max(near, along), 0.0) / (TILE_RUN * TILE_SLOW)
+    if not _tile_up_over(spec, order[0], fast_on - TILE_MARGIN, slow_mid + TILE_MARGIN):
+        return False
+    standing = [0] * TILE_PLAN_SLOTS
+    _tile_stand(spec, order[0], standing, slow_mid - now, now, dt)
+    to_next_fast = max(pitch - half - TILE_PLAYER_RADIUS - 0.6, 0.0) / TILE_RUN
+    for i in range(rows):
+        last = i == rows - 1
+        following = [0] * TILE_PLAN_SLOTS
+        found = False
+        for k in range(TILE_PLAN_SLOTS):
+            if standing[k] == 0:
+                continue
+            t = now + k * dt
+            delay = 0.0 if standing[k] == 2 else TILE_START
+            off_slow = delay + (half + TILE_PLAYER_RADIUS) / (TILE_RUN * TILE_SLOW)
+            to_mid_slow = delay + pitch / (TILE_RUN * TILE_SLOW)
+            if not _tile_up_over(spec, order[i], t, t + off_slow + TILE_MARGIN):
+                continue
+            if last:
+                return True
+            if not _tile_up_over(spec, order[i + 1], t + to_next_fast - TILE_MARGIN, t + to_mid_slow + TILE_MARGIN):
+                continue
+            found = True
+            _tile_stand(spec, order[i + 1], following, k * dt + to_mid_slow, now, dt)
+        if not found:
+            return False
+        standing = following
+    return False
+
+
+def tile_column_window(spec, col, back):
+    """The longest run of ticks, in seconds, in which a runner standing `back` metres before the
+    grid's middle on column `col` may set off and get over: asked every tick (mg-wipeout's 64
+    a second), as a waiting stand-in asks it. A column whose moments come one or two ticks at a
+    time is not one a runner can take: the stand-in that saw one go clear started walking and
+    the next tick it was not, and Trapdoor Run's first grid (seed 304, clear at 37% of the
+    sixteenths of a second WoCourse.tile_column_crossable asks at) had a column nobody crossed."""
+    ticks = int(round(spec["period"] * TILE_TICK_RATE))
+    clear = [tile_column_clear(spec, col, back, k / TILE_TICK_RATE) for k in range(ticks)]
+    if all(clear):
+        return spec["period"]
+    best = run = 0
+    for ok in clear + clear:
+        run = run + 1 if ok else 0
+        best = max(best, run)
+    return best / TILE_TICK_RATE
+
+
+def tile_column_windows(spec, back):
+    """Every column's window (`tile_column_window`), the shorter of the one from the stand point
+    and the one from 1.5 m behind it, where a stand-in waiting for its column steps back to."""
+    return [min(tile_column_window(spec, col, back), tile_column_window(spec, col, back + 1.5))
+            for col in range(spec["cols"])]
+
+
 class Course:
     """A course built forward from the start pad, one section at a time.
 
@@ -397,6 +533,12 @@ class Course:
         centre_z = z0 - depth / 2
         self.add(kind="tiles", at=v(self.x, self.y - 0.25, centre_z), cols=cols, rows=rows,
                  tile=tile, gap=gap, thickness=0.5, period=period, down=down, seed=seed)
+        spec = {"rows": rows, "cols": cols, "tile": tile, "gap": gap, "period": period, "down": down, "seed": seed}
+        windows = tile_column_windows(spec, self._last_z() - centre_z)
+        if min(windows) < TILE_FAIR_WINDOW:
+            raise SystemExit("%s: the tiles with seed %d have a column clear too briefly to cross (%s s on end "
+                             "by column; %.1f s at least): choose another seed or period" % (
+                                 self.doc["id"], seed, ", ".join("%.2f" % w for w in windows), TILE_FAIR_WINDOW))
         for row in range(rows):
             z = z0 - tile / 2 - row * pitch
             self._route({"at": v(self.x, self.y, z), "board": True, "reach": 0.6})
@@ -996,7 +1138,7 @@ def first_splash():
     c.deck(5)
     c.rollers(count=2, speed=60.0)
     c.safe(9)
-    c.tiles(cols=3, rows=3, period=3.4, down=0.24, seed=5)
+    c.tiles(cols=3, rows=3, period=3.4, down=0.24, seed=10)
     c.deck(5)
     c.turn(-90)
     c.deck(4)
@@ -1140,7 +1282,7 @@ def trapdoor_run():
                "Floors that drop out from under you, rides across the gaps between them, pads that throw you on, and at every fork the choice: the long jumps or the spinning pads straight across, or the long way round on the rides.",
                THEMES["mint"], seconds=330.0)
     c.run_out(8)
-    c.tiles(cols=3, rows=4, period=3.4, down=0.25, seed=3)
+    c.tiles(cols=3, rows=4, period=3.4, down=0.25, seed=436)
     c.safe(9)
     c.mover_crossing(length=10, period=6.5)
     c.deck(5)
@@ -1166,7 +1308,7 @@ def trapdoor_run():
     c.deck(6)
     c.turn(90)
     c.deck(4)
-    c.tiles(cols=3, rows=3, period=2.8, down=0.28, seed=29)
+    c.tiles(cols=3, rows=3, period=2.8, down=0.28, seed=59)
     c.safe(9)
     c.trampolines(count=3)
     c.deck(5)
@@ -1190,7 +1332,7 @@ def trapdoor_run():
     c.safe(9)
     c.climb(length=14, rise=-3.0)
     c.safe(9)
-    c.tiles(cols=3, rows=4, period=3.0, down=0.28, seed=53)
+    c.tiles(cols=3, rows=4, period=3.0, down=0.28, seed=42)
     c.deck(4)
     c.finish()
     return c.build()
@@ -1418,7 +1560,7 @@ def grand_tour():
     # Safe is the left lane: the ferry is a wait; the logs are quicker if you stay on them.
     c.fork(by_the_ferry, by_the_rollers)
     c.safe(9)
-    c.tiles(cols=3, rows=4, period=3.2, down=0.25, seed=7)
+    c.tiles(cols=3, rows=4, period=3.2, down=0.25, seed=34)
     c.deck(5)
     c.pendulums(width=3.0, count=2, period=3.0)
     c.safe(9)
