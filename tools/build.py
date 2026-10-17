@@ -1211,6 +1211,7 @@ def spin_cycle():
     c.deck(4)
     c.gap(2.6)
     c.finish()
+    c.event(tint=(0.20,0.72,0.80), text="SPIN CYCLE")
     return c.build()
 
 
@@ -1286,6 +1287,7 @@ def punch_alley():
     c.pusher_alley(count=2, period=1.8)
     c.gap(2.2)
     c.finish()
+    c.event(tint=(0.85,0.30,0.30), text="PUNCH ALLEY")
     return c.build()
 
 
@@ -1347,6 +1349,7 @@ def trapdoor_run():
     c.tiles(cols=3, rows=4, period=3.0, down=0.28, seed=42)
     c.deck(4)
     c.finish()
+    c.event(tint=(0.30,0.80,0.55), text="TRAPDOOR RUN")
     return c.build()
 
 
@@ -1488,6 +1491,7 @@ def uphill_belt():
     c.trampolines(count=2)
     c.deck(4)
     c.finish()
+    c.event(tint=(0.95,0.75,0.25), text="UPHILL BELT")
     return c.build()
 
 
